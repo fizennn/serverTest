@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "es2022",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true, // Đã có, bỏ qua kiểm tra .d.ts của thư viện
+    "noImplicitAny": false, // Tắt kiểm tra implicit 'any'
+    "strictNullChecks": false, // Tắt kiểm tra null/undefined
+    "strict": false, // Tắt toàn bộ strict type-checking
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@apps/*": ["../../apps/*"]
+    }
+  },
+  "include": ["src/**/*", "../back_end_mvotx_kol/src/upload", "src/upload"],
+  "exclude": ["node_modules", "dist"]
+}
