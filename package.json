@@ -54,6 +54,7 @@
     "string-width": "^7.2.0",
     "stripe": "^14.7.0",
     "swagger-ui-express": "^5.0.0",
+    "tsconfig-paths": "^4.2.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
@@ -80,7 +81,6 @@
     "ts-jest": "^29.1.0",
     "ts-loader": "^9.4.3",
     "ts-node": "^10.9.1",
-    "tsconfig-paths": "^4.2.1",
     "typescript": "^5.1.3"
   },
   "jest": {
