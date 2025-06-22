@@ -11,11 +11,11 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { VouchersService } from '../services/vouchers.service';
-import { CreateVoucherDto, UpdateVoucherDto, VoucherResponseDto, PaginatedVoucherResponseDto } from '../dtos/voucher.dto';
+import { CreateVoucherDto, UpdateVoucherDto, VoucherResponseDto, PaginatedVoucherResponseDto, CheckVoucherDto, CalculateMultipleVouchersDto } from '../dtos/voucher.dto';
 import { JwtAuthGuard } from '@/guards/jwt-auth.guard';
 import { AdminGuard } from '@/guards/admin.guard';
 
-@ApiTags('Vouchers')
+@ApiTags('Voucher - Hệ thống giảm giá')
 @Controller('vouchers')
 export class VouchersController {
   constructor(private readonly vouchersService: VouchersService) {}
@@ -23,24 +23,34 @@ export class VouchersController {
   @Post()
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Tạo voucher mới (Admin only)' })
-  @ApiResponse({ status: 201, description: 'Voucher được tạo thành công', type: PaginatedVoucherResponseDto })
+  @ApiOperation({ 
+    summary: 'Tạo voucher mới',
+    description: 'Tạo voucher với 2 loại: item (giảm giá sản phẩm) và ship (giảm giá vận chuyển). Mỗi voucher có điều kiện tối thiểu và giới hạn giảm giá riêng.'
+  })
+  @ApiResponse({ status: 201, description: 'Voucher được tạo thành công' })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
   create(@Body() createVoucherDto: CreateVoucherDto) {
     return this.vouchersService.create(createVoucherDto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Lấy danh sách tất cả vouchers' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Số trang hiện tại' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Số lượng voucher trên mỗi trang' })
-  @ApiResponse({ status: 200, description: 'Danh sách vouchers đã được phân trang', type: PaginatedVoucherResponseDto })
-  findAll(@Query('page') page: number = 1, @Query('limit') limit: number = 10) {
-    return this.vouchersService.findAll(+page, +limit);
+  @ApiOperation({ 
+    summary: 'Lấy danh sách voucher',
+    description: 'Lấy danh sách voucher có phân trang. Hỗ trợ 2 loại: item (giảm giá sản phẩm) và ship (giảm giá vận chuyển).'
+  })
+  @ApiQuery({ name: 'page', required: false, description: 'Trang hiện tại', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, description: 'Số lượng item trên mỗi trang', example: 10 })
+  @ApiResponse({ status: 200, description: 'Danh sách voucher', type: PaginatedVoucherResponseDto })
+  findAll(@Query('page') page?: number, @Query('limit') limit?: number) {
+    return this.vouchersService.findAll(page, limit);
   }
 
   @Get('active')
-  @ApiOperation({ summary: 'Lấy danh sách vouchers đang hoạt động' })
-  @ApiResponse({ status: 200, description: 'Danh sách vouchers đang hoạt động', type: [VoucherResponseDto] })
+  @ApiOperation({ 
+    summary: 'Lấy danh sách voucher đang hoạt động',
+    description: 'Lấy danh sách voucher đang trong thời gian hiệu lực, có stock và chưa bị vô hiệu hóa. Bao gồm cả item và ship voucher.'
+  })
+  @ApiResponse({ status: 200, description: 'Danh sách voucher đang hoạt động' })
   findActive() {
     return this.vouchersService.findActive();
   }
@@ -106,5 +116,134 @@ export class VouchersController {
     @Body('amount') amount: number,
   ) {
     return this.vouchersService.checkVoucherValidity(voucherId, userId, amount);
+  }
+
+  @Post(':id/check')
+  @ApiOperation({ 
+    summary: 'Kiểm tra và tính toán voucher discount',
+    description: 'Kiểm tra tính hợp lệ của voucher và tính toán discount theo type (item/ship). Trả về thông tin chi tiết về discount có thể áp dụng.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Voucher được kiểm tra thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        valid: { type: 'boolean', example: true },
+        itemDiscount: { type: 'number', example: 50000, description: 'Giảm giá cho sản phẩm' },
+        shipDiscount: { type: 'number', example: 0, description: 'Giảm giá cho vận chuyển' },
+        message: { type: 'string', example: 'Voucher hợp lệ' },
+        voucher: { 
+          type: 'object',
+          properties: {
+            _id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+            type: { type: 'string', example: 'item', enum: ['item', 'ship'] },
+            disCount: { type: 'number', example: 10 },
+            condition: { type: 'number', example: 500000 },
+            limit: { type: 'number', example: 100000 }
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Voucher không hợp lệ' })
+  async checkVoucher(
+    @Param('id') id: string,
+    @Body() checkVoucherDto: CheckVoucherDto
+  ) {
+    const { userId, subtotal, shipCost } = checkVoucherDto;
+    return await this.vouchersService.calculateVoucherDiscount(
+      id,
+      userId,
+      subtotal,
+      shipCost
+    );
+  }
+
+  @Post('calculate-discounts')
+  @ApiOperation({ 
+    summary: 'Tính toán discount cho nhiều voucher',
+    description: 'Tính toán tổng discount cho nhiều voucher cùng lúc. Hỗ trợ kết hợp item và ship voucher. Trả về thông tin chi tiết về discount và lỗi nếu có.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Tính toán discount thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        totalItemDiscount: { type: 'number', example: 80000, description: 'Tổng giảm giá cho sản phẩm' },
+        totalShipDiscount: { type: 'number', example: 15000, description: 'Tổng giảm giá cho vận chuyển' },
+        validVouchers: { 
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              voucherId: { type: 'string', example: '507f1f77bcf86cd799439011' },
+              itemDiscount: { type: 'number', example: 50000 },
+              shipDiscount: { type: 'number', example: 0 }
+            }
+          }
+        },
+        errors: { 
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              voucherId: { type: 'string', example: '507f1f77bcf86cd799439012' },
+              message: { type: 'string', example: 'Voucher is out of stock' }
+            }
+          }
+        },
+        finalTotal: { type: 'number', example: 935000, description: 'Tổng tiền cuối cùng sau khi áp dụng tất cả voucher' }
+      }
+    }
+  })
+  async calculateMultipleVouchers(
+    @Body() calculateDto: CalculateMultipleVouchersDto
+  ) {
+    const { userId, subtotal, shipCost, voucherIds } = calculateDto;
+    let totalItemDiscount = 0;
+    let totalShipDiscount = 0;
+    const validVouchers = [];
+    const errors = [];
+
+    for (const voucherId of voucherIds) {
+      try {
+        const result = await this.vouchersService.calculateVoucherDiscount(
+          voucherId,
+          userId,
+          subtotal,
+          shipCost
+        );
+
+        if (result.valid) {
+          totalItemDiscount += result.itemDiscount;
+          totalShipDiscount += result.shipDiscount;
+          validVouchers.push({
+            voucherId,
+            itemDiscount: result.itemDiscount,
+            shipDiscount: result.shipDiscount
+          });
+        } else {
+          errors.push({
+            voucherId,
+            message: result.message
+          });
+        }
+      } catch (error) {
+        errors.push({
+          voucherId,
+          message: error.message
+        });
+      }
+    }
+
+    return {
+      totalItemDiscount,
+      totalShipDiscount,
+      validVouchers,
+      errors,
+      finalTotal: subtotal - totalItemDiscount + (shipCost - totalShipDiscount)
+    };
   }
 } 

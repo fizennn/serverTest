@@ -6,7 +6,8 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { User, UserDocument } from '../schemas/user.schema';
+import { User, UserDocument, Address } from '../schemas/user.schema';
+import { CreateAddressDto, UpdateAddressDto } from '../dtos/address.dto';
 import { hashPassword } from '@/utils/password';
 import { generateUsers } from '@/utils/seed-users';
 import { PaginatedResponse } from '../../shared/types';
@@ -208,5 +209,158 @@ export class UsersService {
   async generateUsers(count: number): Promise<UserDocument[]> {
     const generatedUsers = await generateUsers(count);
     return this.createMany(generatedUsers);
+  }
+
+  async addVoucherToUser(userId: string, voucherId: string, vouchersService: any): Promise<UserDocument> {
+    if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(voucherId)) {
+      throw new BadRequestException('ID không hợp lệ');
+    }
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy user');
+    }
+    // Kiểm tra đã có voucher chưa
+    if (user.vouchers && user.vouchers.includes(voucherId)) {
+      throw new BadRequestException('User đã có voucher này');
+    }
+    // Gọi service voucher để thêm user vào voucher
+    await vouchersService.addUserToVoucher(voucherId, userId);
+    // Thêm voucher vào user
+    user.vouchers = user.vouchers || [];
+    user.vouchers.push(voucherId);
+    await user.save();
+    return user;
+  }
+
+  // Address methods
+  async addAddress(userId: string, addressData: CreateAddressDto): Promise<UserDocument> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('ID user không hợp lệ');
+    }
+
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy user');
+    }
+
+    const newAddress: Address = {
+      phone: addressData.phone,
+      address: addressData.address,
+    };
+
+    user.addresses = user.addresses || [];
+    user.addresses.push(newAddress);
+    await user.save();
+
+    this.logger.log(`Address added to user ${userId}`);
+    return user;
+  }
+
+  async updateAddress(userId: string, addressIndex: number, addressData: UpdateAddressDto): Promise<UserDocument> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('ID user không hợp lệ');
+    }
+
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy user');
+    }
+
+    if (!user.addresses || addressIndex < 0 || addressIndex >= user.addresses.length) {
+      throw new BadRequestException('Index address không hợp lệ');
+    }
+
+    const address = user.addresses[addressIndex];
+    if (addressData.phone) address.phone = addressData.phone;
+    if (addressData.address) address.address = addressData.address;
+
+    await user.save();
+
+    this.logger.log(`Address ${addressIndex} updated for user ${userId}`);
+    return user;
+  }
+
+  async updateAddressById(userId: string, addressId: string, addressData: UpdateAddressDto): Promise<UserDocument> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('ID user không hợp lệ');
+    }
+
+    if (!Types.ObjectId.isValid(addressId)) {
+      throw new BadRequestException('ID address không hợp lệ');
+    }
+
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy user');
+    }
+
+    if (!user.addresses || user.addresses.length === 0) {
+      throw new BadRequestException('User không có địa chỉ nào');
+    }
+
+    // Tìm address theo _id
+    const address = user.addresses.find(
+      addr => addr._id?.toString() === addressId
+    );
+
+    if (!address) {
+      throw new NotFoundException('Không tìm thấy địa chỉ với ID này');
+    }
+
+    // Cập nhật thông tin
+    if (addressData.phone) address.phone = addressData.phone;
+    if (addressData.address) address.address = addressData.address;
+
+    await user.save();
+
+    this.logger.log(`Address ${addressId} updated for user ${userId}`);
+    return user;
+  }
+
+  async removeAddress(userId: string, addressId: string): Promise<UserDocument> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('ID user không hợp lệ');
+    }
+
+    if (!Types.ObjectId.isValid(addressId)) {
+      throw new BadRequestException('ID address không hợp lệ');
+    }
+
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy user');
+    }
+
+    if (!user.addresses || user.addresses.length === 0) {
+      throw new BadRequestException('User không có địa chỉ nào');
+    }
+
+    // Tìm và xóa address theo _id
+    const addressIndex = user.addresses.findIndex(
+      address => address._id?.toString() === addressId
+    );
+
+    if (addressIndex === -1) {
+      throw new NotFoundException('Không tìm thấy địa chỉ với ID này');
+    }
+
+    user.addresses.splice(addressIndex, 1);
+    await user.save();
+
+    this.logger.log(`Address ${addressId} removed from user ${userId}`);
+    return user;
+  }
+
+  async getAddresses(userId: string): Promise<Address[]> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('ID user không hợp lệ');
+    }
+
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy user');
+    }
+
+    return user.addresses || [];
   }
 }

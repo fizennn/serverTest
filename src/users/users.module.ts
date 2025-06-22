@@ -11,6 +11,10 @@ import { JwtStrategy } from 'src/strategies/jwt.strategy';
 import { UsersController } from './controller/users.controller';
 import { MailService } from '@/mail/mail.service';
 import { MailModule } from '@/mail/mail.module';
+import { VouchersModule } from '../vouchers/vouchers.module';
+import { AddressAccessGuard } from '../guards/address-access.guard';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { AdminGuard } from '../guards/admin.guard';
 
 @Module({
   imports: [
@@ -26,9 +30,19 @@ import { MailModule } from '@/mail/mail.module';
       secret: process.env.JWT_ACCESS_SECRET,
       signOptions: { expiresIn: '10m' },
     }),
-    MailModule
+    MailModule,
+    VouchersModule,
   ],
   controllers: [AuthController, UsersController],
-  providers: [UsersService, AuthService, LocalStrategy, JwtStrategy,MailService],
+  providers: [
+    UsersService, 
+    AuthService, 
+    LocalStrategy, 
+    JwtStrategy,
+    MailService,
+    AddressAccessGuard,
+    JwtAuthGuard,
+    AdminGuard
+  ],
 })
 export class UsersModule {}

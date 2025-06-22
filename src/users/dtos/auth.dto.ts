@@ -73,6 +73,21 @@ export class UserResponseDto {
   @ApiProperty()
   address?: string;
 
+  @ApiProperty({ 
+    type: 'array', 
+    items: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        phone: { type: 'string' },
+        address: { type: 'string' }
+      }
+    },
+    description: 'Danh sách địa chỉ chi tiết của user',
+    required: false 
+  })
+  addresses?: any[];
+
   @ApiProperty()
   city?: string;
 
@@ -87,6 +102,28 @@ export class UserResponseDto {
 
   @ApiProperty()
   updatedAt?: Date;
+
+  @ApiProperty({ 
+    type: 'array', 
+    items: {
+      type: 'object',
+      properties: {
+        _id: { type: 'string' },
+        code: { type: 'string' },
+        name: { type: 'string' },
+        description: { type: 'string' },
+        disCount: { type: 'number' },
+        condition: { type: 'number' },
+        start: { type: 'string', format: 'date-time' },
+        end: { type: 'string', format: 'date-time' },
+        stock: { type: 'number' },
+        isDisable: { type: 'boolean' }
+      }
+    },
+    description: 'Danh sách voucher của user',
+    required: false 
+  })
+  vouchers?: any[];
 }
 
 export class AuthResponseDto {

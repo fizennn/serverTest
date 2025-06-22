@@ -7,6 +7,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { verifyPassword, hashPassword } from '@/utils/password';
 import { randomUUID } from 'crypto';
+import { VouchersService } from '../../vouchers/services/vouchers.service';
 
 @Injectable()
 export class AuthService {
@@ -14,6 +15,7 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     @InjectModel(User.name) private userModel: Model<User>,
+    private vouchersService: VouchersService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<UserDocument> {
@@ -32,6 +34,21 @@ export class AuthService {
 
   async login(user: UserDocument): Promise<AuthResponseDto> {
     const tokens = await this.generateTokens(user);
+    
+    // Populate vouchers data
+    let userVouchers = [];
+    if (user.vouchers && user.vouchers.length > 0) {
+      try {
+        const voucherPromises = user.vouchers.map(voucherId => 
+          this.vouchersService.findOne(voucherId.toString())
+        );
+        userVouchers = await Promise.all(voucherPromises);
+      } catch (error) {
+        // Nếu có lỗi khi lấy voucher, vẫn trả về user data nhưng không có voucher
+        console.error('Error fetching vouchers:', error);
+      }
+    }
+
     return {
       tokens,
       user: {
@@ -44,12 +61,14 @@ export class AuthService {
         loyaltyPoints: user.loyaltyPoints,
         phoneNumber: user.phoneNumber,
         address: user.address,
+        addresses: user.addresses,
         city: user.city,
         country: user.country,
         postalCode: user.postalCode,
         dateOfBirth: user.dateOfBirth,
         lastLogin: user.lastLogin,
         createdAt: user.createdAt,
+        vouchers: userVouchers,
       },
     };
   }

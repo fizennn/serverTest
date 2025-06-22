@@ -25,7 +25,8 @@ import { CurrentUser } from '@/decorators/current-user.decorator';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { AppService } from '@/app/services/app.service';
 import { Response } from 'express';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
+import { VariantIdDto, SizeIdDto } from '../dtos/product.dto';
 @ApiTags('Quản lý sản phẩm')
 @ApiBearerAuth('JWT-auth')
 @Controller('products')
@@ -47,6 +48,58 @@ export class ProductsController {
   @Get('topRated')
   getTopRatedProducts() {
     return this.productsService.findTopRated();
+  }
+
+  @Get('variant/:variantId')
+  @ApiOperation({ 
+    summary: 'Lấy tất cả sản phẩm theo ID của biến thể màu sắc',
+    description: 'Tìm kiếm tất cả sản phẩm có chứa biến thể với ID được chỉ định'
+  })
+  @ApiParam({ 
+    name: 'variantId', 
+    description: 'ID của biến thể màu sắc',
+    example: '68551b6f0bc19e44a4ae1920'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Danh sách sản phẩm tìm thấy' 
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'ID biến thể không hợp lệ' 
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'Không tìm thấy sản phẩm nào với variant ID này' 
+  })
+  getProductsByVariantId(@Param() params: VariantIdDto) {
+    return this.productsService.findByVariantId(params.variantId);
+  }
+
+  @Get('size/:sizeId')
+  @ApiOperation({ 
+    summary: 'Lấy tất cả sản phẩm theo ID của size',
+    description: 'Tìm kiếm tất cả sản phẩm có chứa size với ID được chỉ định'
+  })
+  @ApiParam({ 
+    name: 'sizeId', 
+    description: 'ID của size',
+    example: '68551b6f0bc19e44a4ae1921'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Danh sách sản phẩm tìm thấy' 
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'ID size không hợp lệ' 
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'Không tìm thấy sản phẩm nào với size ID này' 
+  })
+  getProductsBySizeId(@Param() params: SizeIdDto) {
+    return this.productsService.findBySizeId(params.sizeId);
   }
 
   @Get(':id')

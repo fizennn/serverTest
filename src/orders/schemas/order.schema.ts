@@ -1,81 +1,145 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import * as mongoose from 'mongoose';
-import { OrderItem, PaymentResult, ShippingDetails } from 'src/interfaces';
-import { User } from 'src/users/schemas/user.schema';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { User } from '../../users/schemas/user.schema';
+import { HydratedDocument } from 'mongoose';
+import { ApiProperty } from '@nestjs/swagger';
 
-export type OrderDocument = Order & mongoose.Document;
+export type OrderDocument = HydratedDocument<Order>;
+
+@Schema({ _id: false })
+export class OrderItem {
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    ref: 'Product',
+  })
+  product!: mongoose.Types.ObjectId;
+
+  @Prop({ required: true })
+  quantity!: number;
+
+  @Prop({ required: true })
+  price!: number;
+
+  @Prop({ required: true })
+  variant!: string;
+}
 
 @Schema({ timestamps: true })
 export class Order {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' })
-  user!: User;
-
-  @Prop({
-    required: true,
-    type: [
-      {
-        name: { required: true, type: String },
-        qty: { required: true, type: Number },
-        image: { required: true, type: String },
-        price: { required: true, type: Number },
-        productId: {
-          type: mongoose.Schema.Types.ObjectId,
-          required: true,
-          ref: 'Product',
-        },
-      },
-    ],
+  @ApiProperty({
+    description: 'ID của đơn hàng',
+    example: '507f1f77bcf86cd799439011',
   })
-  orderItems!: OrderItem[];
+  _id!: mongoose.Types.ObjectId;
 
-  @Prop({
-    required: true,
-    type: {
-      address: { required: true, type: String },
-      city: { required: true, type: String },
-      postalCode: { required: true, type: String },
-      country: { required: true, type: String },
-    },
+  @ApiProperty({
+    description: 'ID của người dùng đặt hàng',
+    example: '507f1f77bcf86cd799439012',
   })
-  shippingDetails!: ShippingDetails;
-
-  @Prop({ required: true })
-  paymentMethod!: string;
-
   @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    ref: 'User',
+  })
+  idUser!: User;
+
+  @ApiProperty({
+    description: 'Ghi chú đơn hàng',
+    example: 'Giao hàng vào buổi chiều',
     required: false,
+  })
+  @Prop({ required: false, default: '' })
+  note!: string;
+
+  @ApiProperty({
+    description: 'Địa chỉ giao hàng',
+  })
+  @Prop({
+    required: true,
     type: {
-      id: { required: true, type: String },
-      status: { required: true, type: String },
-      update_time: { required: true, type: String },
-      email_address: { required: true, type: String },
+      phone: { type: String, required: true },
+      address: { type: String, required: true },
     },
   })
-  paymentResult!: PaymentResult;
+  address!: {
+    phone: string;
+    address: string;
+  };
 
-  @Prop({ required: true, default: 0.0 })
-  taxPrice!: number;
+  @ApiProperty({
+    description: 'Danh sách sản phẩm trong đơn hàng',
+    type: [OrderItem],
+  })
+  @Prop({ required: true, type: [OrderItem], default: [] })
+  items!: OrderItem[];
 
-  @Prop({ required: true, default: 0.0 })
-  shippingPrice!: number;
+  @ApiProperty({
+    description: 'Danh sách voucher được áp dụng',
+    type: [mongoose.Types.ObjectId],
+    required: false,
+  })
+  @Prop({
+    type: [mongoose.Schema.Types.ObjectId],
+    ref: 'Voucher',
+    required: false,
+    default: [],
+  })
+  vouchers!: mongoose.Types.ObjectId[];
 
-  @Prop({ required: true, default: 0.0 })
-  itemsPrice!: number;
+  @ApiProperty({
+    description: 'Tổng tiền đơn hàng',
+    example: 1500000,
+  })
+  @Prop({ required: true, default: 0 })
+  total!: number;
 
-  @Prop({ required: true, default: 0.0 })
-  totalPrice!: number;
+  @ApiProperty({
+    description: 'Giảm giá cho sản phẩm từ voucher',
+    example: 50000,
+  })
+  @Prop({ required: true, default: 0 })
+  itemDiscount!: number;
 
-  @Prop({ default: false })
-  isPaid!: boolean;
+  @ApiProperty({
+    description: 'Giảm giá cho phí vận chuyển từ voucher',
+    example: 10000,
+  })
+  @Prop({ required: true, default: 0 })
+  shipDiscount!: number;
 
-  @Prop({ required: false })
-  paidAt!: string;
+  @ApiProperty({
+    description: 'Tổng tiền sản phẩm trước khi giảm giá',
+    example: 1500000,
+  })
+  @Prop({ required: true, default: 0 })
+  subtotal!: number;
 
-  @Prop({ default: false })
-  isDelivered!: boolean;
+  @ApiProperty({
+    description: 'Địa chỉ cửa hàng',
+    example: '123 Đường ABC, Quận 1, TP.HCM',
+  })
+  @Prop({ required: true })
+  storeAddress!: string;
 
-  @Prop({ required: false })
-  deliveredAt!: string;
+  @ApiProperty({
+    description: 'Phí vận chuyển',
+    example: 30000,
+  })
+  @Prop({ required: true, default: 0 })
+  shipCost!: number;
+
+  @ApiProperty({
+    description: 'Trạng thái đơn hàng',
+    example: 'pending',
+    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'],
+  })
+  @Prop({
+    required: true,
+    default: 'pending',
+    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'],
+  })
+  status!: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

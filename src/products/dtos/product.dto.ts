@@ -1,7 +1,7 @@
-import { IsString, IsNumber, IsArray, ValidateNested, IsBoolean } from 'class-validator';
+import { IsString, IsNumber, IsArray, ValidateNested, IsBoolean, IsMongoId, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { VariantDto } from './variants.dto';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class ProductDto {
   @ApiProperty({
@@ -12,11 +12,21 @@ export class ProductDto {
   name!: string;
 
   @ApiProperty({
-    description: 'Giá sản phẩm (VND)',
-    example: 250000,
+    description: 'Giá trung bình sản phẩm (định dạng: "giá thấp nhất - giá cao nhất" hoặc số đơn) - Không bắt buộc, sẽ tự động tính từ variants',
+    example: '250000 - 350000',
+    required: false,
   })
-  @IsNumber()
-  price!: number;
+  @IsOptional()
+  @Transform(({ value }) => {
+    // Nếu là số, chuyển thành string format
+    if (typeof value === 'number') {
+      return `${value} - ${value}`;
+    }
+    // Nếu đã là string, giữ nguyên
+    return value;
+  })
+  @IsString()
+  averagePrice?: string;
 
   @ApiProperty({
     description: 'Mô tả sản phẩm',
@@ -54,8 +64,9 @@ export class ProductDto {
     description: 'Số lượng tồn kho',
     example: 100,
   })
+  @IsOptional()
   @IsNumber()
-  countInStock!: number;
+  countInStock: number;
 
   @ApiProperty({
     description: 'Trạng thái sản phẩm',
@@ -81,4 +92,24 @@ export class ProductDto {
   @ValidateNested({ each: true })
   @Type(() => VariantDto)
   variants!: VariantDto[];
+}
+
+export class VariantIdDto {
+  @ApiProperty({
+    description: 'ID của biến thể màu sắc',
+    example: '68551b6f0bc19e44a4ae1920',
+    required: true,
+  })
+  @IsMongoId({ message: 'ID biến thể phải là MongoDB ObjectId hợp lệ' })
+  variantId: string;
+}
+
+export class SizeIdDto {
+  @ApiProperty({
+    description: 'ID của size',
+    example: '68551b6f0bc19e44a4ae1921',
+    required: true,
+  })
+  @IsMongoId({ message: 'ID size phải là MongoDB ObjectId hợp lệ' })
+  sizeId: string;
 }

@@ -38,6 +38,12 @@ export interface User {
   updatedAt: string;
 }
 
+export interface Address {
+  _id?: string;
+  phone: string;
+  address: string;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   message: string;

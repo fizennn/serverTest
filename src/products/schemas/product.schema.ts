@@ -4,7 +4,7 @@ import { User } from '../../users/schemas/user.schema';
 import { HydratedDocument } from 'mongoose';
 import { Variant, Size, VariantSchema, SizeSchema } from './variant.shema';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber } from 'class-validator';
+import { IsNumber, IsString } from 'class-validator';
 
 export type ProductDocument = HydratedDocument<Product>;
 
@@ -54,8 +54,14 @@ export class Product {
   @Prop({ required: true, default: 0 })
   numReviews!: number;
 
-  @Prop({ required: true, default: 0 })
-  price!: number;
+  @ApiProperty({
+    description: 'Giá trung bình sản phẩm (định dạng: "giá thấp nhất - giá cao nhất")',
+    example: '250000 - 350000',
+    default: '0 - 0',
+  })
+  @IsString()
+  @Prop({ required: true, default: '0 - 0' })
+  averagePrice!: string;
 
   @Prop({ required: true, default: 0 })
   countInStock!: number;

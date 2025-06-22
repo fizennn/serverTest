@@ -51,4 +51,9 @@ export class UserDto {
   @Expose()
   updatedAt?: Date;
 
+  @Expose()
+  vouchers?: string[];
+
+  @Expose()
+  addresses?: any[];
 }

@@ -97,7 +97,7 @@ export class ProductsService {
   }
 
   async update(id: string, attrs: Partial<Product>): Promise<ProductDocument> {
-    const { name, price, description, images, brand, category, countInStock } =
+    const { name, averagePrice, description, images, brand, category } =
       attrs;
 
     if (!Types.ObjectId.isValid(id))
@@ -107,13 +107,22 @@ export class ProductsService {
     if (!product) throw new NotFoundException('No product with given ID.');
 
     product.name = name ?? product.name;
-    product.price = price ?? product.price;
+    product.averagePrice = averagePrice ?? product.averagePrice;
     product.description = description ?? product.description;
     product.images = images ?? product.images;
     product.brand = brand ?? product.brand;
     product.category = category ?? product.category;
-    product.countInStock = countInStock ?? product.countInStock;
     product.variants = attrs.variants ?? product.variants;
+
+    // Tính toán lại giá trung bình và tồn kho nếu có variants
+    if (attrs.variants && attrs.variants.length > 0) {
+      product.averagePrice = this.calculateAveragePrice(attrs.variants);
+      product.countInStock = this.calculateTotalStock(attrs.variants);
+    } else {
+      // Nếu không có variants, có thể set mặc định hoặc giữ nguyên
+      // Ở đây, ta giữ nguyên giá trị cũ nếu không có variant mới
+      product.countInStock = attrs.countInStock ?? product.countInStock;
+    }
 
     return product.save();
   }
@@ -187,13 +196,101 @@ export class ProductsService {
   }
 
   async create(productData: Partial<Product>): Promise<ProductDocument> {
+    // Tính toán giá trung bình nếu có variants hoặc sử dụng giá được gửi lên
+    let averagePrice = productData.averagePrice || '0 - 0';
+    if (!productData.averagePrice && productData.variants && productData.variants.length > 0) {
+      averagePrice = this.calculateAveragePrice(productData.variants);
+    }
+    
+    // Tính toán tổng số lượng tồn kho từ các biến thể
+    let countInStock = productData.countInStock || 0;
+    if (productData.variants && productData.variants.length > 0) {
+      countInStock = this.calculateTotalStock(productData.variants);
+    }
+
     const product = await this.productModel.create({
       ...productData,
+      averagePrice,
+      countInStock,
       rating: 0,
       numReviews: 0,
       reviews: [],
     });
 
     return product;
+  }
+
+  async findByVariantId(variantId: string): Promise<ProductDocument[]> {
+    if (!Types.ObjectId.isValid(variantId))
+      throw new BadRequestException('Invalid variant ID.');
+
+    const products = await this.productModel.find({
+      'variants._id': variantId,
+    });
+
+    if (!products.length) 
+      throw new NotFoundException('Không tìm thấy sản phẩm nào với variant ID này.');
+
+    // Lọc và chỉ trả về variant có ID phù hợp
+    const filteredProducts = products.map(product => {
+      const productObj = product.toObject();
+      productObj.variants = productObj.variants.filter(
+        (variant: any) => variant._id.toString() === variantId
+      );
+      return productObj;
+    });
+
+    return filteredProducts as ProductDocument[];
+  }
+
+  async findBySizeId(sizeId: string): Promise<ProductDocument[]> {
+    if (!Types.ObjectId.isValid(sizeId))
+      throw new BadRequestException('Invalid size ID.');
+
+    const products = await this.productModel.find({
+      'variants.sizes._id': sizeId,
+    });
+
+    if (!products.length) 
+      throw new NotFoundException('Không tìm thấy sản phẩm nào với size ID này.');
+
+    // Lọc và chỉ trả về size có ID phù hợp
+    const filteredProducts = products.map(product => {
+      const productObj = product.toObject();
+      productObj.variants = productObj.variants.map((variant: any) => {
+        const filteredVariant = { ...variant };
+        filteredVariant.sizes = variant.sizes.filter(
+          (size: any) => size._id.toString() === sizeId
+        );
+        return filteredVariant;
+      }).filter((variant: any) => variant.sizes.length > 0);
+      return productObj;
+    });
+
+    return filteredProducts as ProductDocument[];
+  }
+
+  /**
+   * Tính toán giá trung bình từ các variants
+   * @param variants Danh sách variants của sản phẩm
+   * @returns Chuỗi giá theo định dạng "giá thấp nhất - giá cao nhất"
+   */
+  private calculateAveragePrice(variants: any[]): string {
+    const allPrices = variants.flatMap(variant => variant.sizes.map(size => size.price));
+    if (allPrices.length === 0) {
+      return '0 - 0';
+    }
+
+    const minPrice = Math.min(...allPrices);
+    const maxPrice = Math.max(...allPrices);
+
+    return `${minPrice} - ${maxPrice}`;
+  }
+
+  private calculateTotalStock(variants: any[]): number {
+    return variants.reduce((totalStock, variant) => {
+      const variantStock = variant.sizes.reduce((acc, size) => acc + (size.stock || 0), 0);
+      return totalStock + variantStock;
+    }, 0);
   }
 }

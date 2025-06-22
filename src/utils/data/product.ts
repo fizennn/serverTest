@@ -1,6 +1,6 @@
 export const sampleProduct = {
   name: 'Sample name',
-  price: 0,
+  averagePrice: '0 - 0',
   image: '/images/sample.jpg',
   brand: 'Sample brand',
   category: 'Sample category',
