@@ -63,9 +63,9 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
 
-  const port = process.env.PORT || 3001;
+  const port = parseInt(process.env.PORT || '3001', 10);
   await app.listen(port);
-
-  console.log(`Application is running on: ${await app.getUrl()}`);
+  console.log(`🚀 App is listening on port ${port}`);
+  console.log(`🌐 Swagger docs: ${await app.getUrl()}/api`);
 }
 bootstrap();
