@@ -66,6 +66,14 @@ async function bootstrap() {
   const port = process.env.PORT || 3001;
   await app.listen(port);
 
+  // Tự động ping server mỗi 5 phút
+  setInterval(() => {
+    const url = `http://localhost:${port}`;
+    fetch(url)
+      .then(() => console.log(`Pinged ${url} at ${new Date().toISOString()}`))
+      .catch((err) => console.error(`Ping failed: ${err}`));
+  }, 5 * 60 * 1000); // 5 phút
+
   console.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();
