@@ -72,7 +72,7 @@ async function bootstrap() {
     fetch(url)
       .then(() => console.log(`Pinged ${url} at ${new Date().toISOString()}`))
       .catch((err) => console.error(`Ping failed: ${err}`));
-  }, 5 * 60 * 1000); // 5 phút
+  }, 15 * 60 * 1000); // 5 phút
 
   console.log(`Application is running on: ${await app.getUrl()}`);
 }
