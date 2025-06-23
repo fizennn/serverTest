@@ -68,7 +68,7 @@ async function bootstrap() {
 
   // Tự động ping server mỗi 5 phút
   setInterval(() => {
-    const url = `http://localhost:${port}`;
+    const url = `https://fizennn.click/v1/products`;
     fetch(url)
       .then(() => console.log(`Pinged ${url} at ${new Date().toISOString()}`))
       .catch((err) => console.error(`Ping failed: ${err}`));
