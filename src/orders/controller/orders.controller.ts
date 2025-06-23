@@ -27,7 +27,7 @@ export class OrdersController {
   @Post()
   @ApiOperation({ 
     summary: 'Tạo đơn hàng mới',
-    description: 'Tạo đơn hàng với hệ thống voucher mới. Hỗ trợ 2 loại voucher: item (giảm giá sản phẩm) và ship (giảm giá vận chuyển). Mỗi voucher có điều kiện tối thiểu và giới hạn giảm giá riêng.'
+    description: 'Tạo đơn hàng với hệ thống voucher mới. Hỗ trợ 2 loại voucher: item (giảm giá sản phẩm) và ship (giảm giá vận chuyển). Mỗi voucher có điều kiện tối thiểu và giới hạn giảm giá riêng. Hỗ trợ mua tại cửa hàng (atStore = true) - không tính phí ship. Hỗ trợ 2 phương thức thanh toán: COD (tiền mặt) và payOS (chuyển khoản).'
   })
   @ApiResponse({ 
     status: 201, 
@@ -44,6 +44,8 @@ export class OrdersController {
             email: { type: 'string', example: 'user@example.com' }
           }
         },
+        atStore: { type: 'boolean', example: false, description: 'Xác định đơn hàng mua tại cửa hàng (không tính phí ship)' },
+        payment: { type: 'string', example: 'COD', description: 'Phương thức thanh toán (COD: tiền mặt, payOS: chuyển khoản)' },
         items: {
           type: 'array',
           items: {
@@ -88,7 +90,7 @@ export class OrdersController {
         itemDiscount: { type: 'number', example: 50000, description: 'Tổng giảm giá cho sản phẩm' },
         shipDiscount: { type: 'number', example: 10000, description: 'Tổng giảm giá cho vận chuyển' },
         total: { type: 'number', example: 940000, description: 'Tổng tiền cuối cùng sau khi áp dụng voucher' },
-        shipCost: { type: 'number', example: 30000, description: 'Phí vận chuyển' },
+        shipCost: { type: 'number', example: 30000, description: 'Phí vận chuyển (0 nếu atStore = true)' },
         status: { type: 'string', example: 'pending' }
       }
     }
@@ -136,7 +138,10 @@ export class OrdersController {
 
   @UseGuards(AdminGuard)
   @Put(':id/status')
-  @ApiOperation({ summary: 'Cập nhật trạng thái đơn hàng (Admin)' })
+  @ApiOperation({ 
+    summary: 'Cập nhật trạng thái đơn hàng (Admin)',
+    description: 'Cập nhật trạng thái, ghi chú, phương thức thanh toán hoặc chuyển đổi giữa mua tại cửa hàng và giao hàng. Khi atStore = true, phí ship sẽ được đặt về 0. Hỗ trợ 2 phương thức thanh toán: COD (tiền mặt) và payOS (chuyển khoản).'
+  })
   @ApiParam({ name: 'id', description: 'ID đơn hàng' })
   @ApiResponse({ status: 200, description: 'Cập nhật thành công' })
   async updateOrderStatus(

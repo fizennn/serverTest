@@ -12,9 +12,9 @@ export class AddToCartDto {
   qty!: number;
 
   @ApiProperty({
-    description: 'ID của sản phẩm',
+    description: 'ID của size sản phẩm',
     example: '60d5f483f1a2b1234567890a',
   })
   @IsString()
-  productId!: string;
+  sizeId!: string;
 }

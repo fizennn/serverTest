@@ -29,7 +29,7 @@ export class OrdersService {
     orderAttrs: CreateOrderDto,
     userId: string,
   ): Promise<OrderDocument> {
-    const { items, address, note, vouchers, storeAddress, shipCost } = orderAttrs;
+    const { items, address, note, vouchers, storeAddress, shipCost, atStore = false, payment = 'COD' } = orderAttrs;
 
     if (items && items.length < 1)
       throw new BadRequestException('No order items received.');
@@ -107,6 +107,9 @@ export class OrdersService {
       await product.save();
     }
 
+    // Tính toán phí ship dựa trên atStore
+    const finalShipCost = atStore ? 0 : shipCost;
+
     // Tính toán discount từ voucher
     let itemDiscount = 0; // Giảm giá cho sản phẩm
     let shipDiscount = 0; // Giảm giá cho phí vận chuyển
@@ -123,7 +126,7 @@ export class OrdersService {
           voucherId,
           userId,
           subtotal,
-          shipCost
+          finalShipCost
         );
 
         if (!voucherResult.valid) {
@@ -147,12 +150,14 @@ export class OrdersService {
     }
 
     // Tính tổng tiền cuối cùng
-    const total = subtotal - itemDiscount + (shipCost - shipDiscount);
+    const total = subtotal - itemDiscount + (finalShipCost - shipDiscount);
 
     try {
       // Tạo order với đầy đủ dữ liệu
       const orderData = {
         idUser: new Types.ObjectId(userId),
+        atStore,
+        payment,
         address: {
           phone: userAddress.phone,
           address: userAddress.address,
@@ -164,7 +169,7 @@ export class OrdersService {
         shipDiscount, // Giảm giá cho phí vận chuyển
         total,
         storeAddress,
-        shipCost,
+        shipCost: finalShipCost,
         status: 'pending',
       };
 
@@ -175,7 +180,7 @@ export class OrdersService {
 
       // Log để debug
       console.log('Creating order with data:', JSON.stringify(orderData, null, 2));
-      console.log('Subtotal:', subtotal, 'Item Discount:', itemDiscount, 'Ship Discount:', shipDiscount, 'Total:', total);
+      console.log('Subtotal:', subtotal, 'Item Discount:', itemDiscount, 'Ship Discount:', shipDiscount, 'Total:', total, 'At Store:', atStore, 'Payment:', payment);
 
       const createdOrder = await this.orderModel.create(orderData);
       
@@ -236,6 +241,22 @@ export class OrdersService {
 
     if (updateData.note) {
       order.note = updateData.note;
+    }
+
+    if (updateData.atStore !== undefined) {
+      order.atStore = updateData.atStore;
+      
+      // Nếu chuyển sang mua tại cửa hàng, cập nhật phí ship về 0
+      if (updateData.atStore) {
+        order.shipCost = 0;
+        order.shipDiscount = 0;
+        // Tính lại tổng tiền
+        order.total = order.subtotal - order.itemDiscount;
+      }
+    }
+
+    if (updateData.payment) {
+      order.payment = updateData.payment;
     }
 
     const updatedOrder = await order.save();

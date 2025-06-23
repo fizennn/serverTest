@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class OrderItemDto {
@@ -21,6 +21,25 @@ export class OrderItemDto {
 }
 
 export class CreateOrderDto {
+  @ApiProperty({
+    description: 'Xác định đơn hàng mua tại cửa hàng (không tính phí ship)',
+    example: false,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  atStore?: boolean;
+
+  @ApiProperty({
+    description: 'Phương thức thanh toán',
+    example: 'COD',
+    enum: ['COD', 'payOS'],
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(['COD', 'payOS'])
+  payment?: string;
+
   @ApiProperty({
     description: 'Ghi chú đơn hàng',
     example: 'Giao hàng vào buổi chiều',

@@ -1,7 +1,26 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 
 export class UpdateOrderDto {
+  @ApiProperty({
+    description: 'Xác định đơn hàng mua tại cửa hàng (không tính phí ship)',
+    example: false,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  atStore?: boolean;
+
+  @ApiProperty({
+    description: 'Phương thức thanh toán',
+    example: 'COD',
+    enum: ['COD', 'payOS'],
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(['COD', 'payOS'])
+  payment?: string;
+
   @ApiProperty({
     description: 'Trạng thái đơn hàng',
     example: 'confirmed',

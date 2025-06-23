@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
 import { User } from '../../users/schemas/user.schema';
-import { CartItem, ShippingDetails } from '../../interfaces';
+import { CartItem } from '../../interfaces';
 
 export type CartDocument = Cart & Document;
 
@@ -17,6 +17,12 @@ export class Cart {
         ref: 'Product',
         required: true,
       },
+      sizeId: {
+        type: MongooseSchema.Types.ObjectId,
+        required: true,
+      },
+      size: { type: String, required: true },
+      color: { type: String, required: true },
       name: { type: String, required: true },
       image: { type: String, required: true },
       price: { type: Number, required: true },
@@ -25,32 +31,6 @@ export class Cart {
     },
   ])
   items!: CartItem[];
-
-  @Prop({
-    type: {
-      address: String,
-      city: String,
-      postalCode: String,
-      country: String,
-    },
-    required: false,
-  })
-  shippingDetails?: ShippingDetails;
-
-  @Prop({ default: 'PayPal' })
-  paymentMethod!: string;
-
-  @Prop({ default: 0 })
-  itemsPrice!: number;
-
-  @Prop({ default: 0 })
-  taxPrice!: number;
-
-  @Prop({ default: 0 })
-  shippingPrice!: number;
-
-  @Prop({ default: 0 })
-  totalPrice!: number;
 }
 
 export const CartSchema = SchemaFactory.createForClass(Cart);

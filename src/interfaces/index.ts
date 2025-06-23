@@ -1,12 +1,5 @@
 import { Product, ProductDocument } from 'src/products/schemas/product.schema';
 
-export interface ShippingDetails {
-  address: string;
-  city: string;
-  postalCode: string;
-  country: string;
-}
-
 export interface OrderItem {
   name: string;
   qty: number;
@@ -25,6 +18,9 @@ export interface PaymentResult {
 
 export interface CartItem {
   productId: string;
+  sizeId: string;
+  size: string;
+  color: string;
   name: string;
   image: string;
   price: number;

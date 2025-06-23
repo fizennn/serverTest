@@ -45,6 +45,25 @@ export class Order {
   idUser!: User;
 
   @ApiProperty({
+    description: 'Xác định đơn hàng mua tại cửa hàng (không tính phí ship)',
+    example: false,
+  })
+  @Prop({ required: true, default: false })
+  atStore!: boolean;
+
+  @ApiProperty({
+    description: 'Phương thức thanh toán',
+    example: 'COD',
+    enum: ['COD', 'payOS'],
+  })
+  @Prop({
+    required: true,
+    default: 'COD',
+    enum: ['COD', 'payOS'],
+  })
+  payment!: string;
+
+  @ApiProperty({
     description: 'Ghi chú đơn hàng',
     example: 'Giao hàng vào buổi chiều',
     required: false,
