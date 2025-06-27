@@ -22,6 +22,6 @@ import { OrderSchema } from '@/orders/schemas/order.schema';
   ],
   providers: [ProductsService, AppService],
   controllers: [ProductsController],
-  exports: [ProductsService],
+  exports: [ProductsService, MongooseModule],
 })
 export class ProductsModule {}

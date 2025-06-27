@@ -36,7 +36,7 @@ export class Product {
   @Prop({ required: true })
   brand!: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, type: mongoose.Schema.Types.ObjectId, ref: 'Category' })
   category!: string;
 
   @Prop({ required: true, type: [String], default: [] })

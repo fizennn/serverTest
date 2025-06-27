@@ -14,10 +14,19 @@ async function bootstrap() {
 
   app.use(helmet());
 
+  // Cho phép tất cả domain truy cập
   app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || 'http://localhost:3000',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    origin: true, // Hoặc có thể dùng '*' 
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type', 
+      'Authorization', 
+      'X-Requested-With',
+      'Accept',
+      'Origin'
+    ],
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
   });
 
   app.enableVersioning({
@@ -49,15 +58,42 @@ async function bootstrap() {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
       },
       'JWT-auth',
     )
+    // Thêm security scheme global
+    .addSecurity('JWT-auth', {
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+    })
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
+  
+  // Áp dụng JWT cho tất cả các endpoints
+  Object.keys(document.paths).forEach(path => {
+    Object.keys(document.paths[path]).forEach(method => {
+      if (document.paths[path][method].operationId) {
+        document.paths[path][method].security = [{ 'JWT-auth': [] }];
+      }
+    });
+  });
+
   SwaggerModule.setup('api', app, document, {
     swaggerOptions: {
       persistAuthorization: true,
+      securityDefinitions: {
+        'JWT-auth': {
+          type: 'apiKey',
+          name: 'Authorization',
+          in: 'header',
+          description: 'Enter your bearer token in the format **Bearer &lt;token&gt;**'
+        }
+      }
     },
   });
 
@@ -66,14 +102,7 @@ async function bootstrap() {
   const port = process.env.PORT || 3001;
   await app.listen(port);
 
-  // Tự động ping server mỗi 5 phút
-  setInterval(() => {
-    const url = `https://fizennn.click/v1/products`;
-    fetch(url)
-      .then(() => console.log(`Pinged ${url} at ${new Date().toISOString()}`))
-      .catch((err) => console.error(`Ping failed: ${err}`));
-  }, 15 * 60 * 1000); // 5 phút
-
   console.log(`Application is running on: ${await app.getUrl()}`);
 }
+
 bootstrap();

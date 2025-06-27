@@ -160,4 +160,30 @@ export class ProductsController {
   ) {
     return this.productsService.createReview(id, user, rating, comment);
   }
+
+  @Get('category/:categoryId')
+  @ApiOperation({
+    summary: 'Lấy tất cả sản phẩm theo category id',
+    description: 'Trả về danh sách sản phẩm thuộc về một category id cụ thể, có phân trang.'
+  })
+  @ApiParam({
+    name: 'categoryId',
+    description: 'ID của category',
+    example: '66551b6f0bc19e44a4ae1920'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Danh sách sản phẩm theo category id (có phân trang)'
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Không tìm thấy sản phẩm nào với category id này'
+  })
+  getProductsByCategory(
+    @Param('categoryId') categoryId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.productsService.findByCategory(categoryId, page, limit);
+  }
 }

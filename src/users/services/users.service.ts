@@ -57,13 +57,11 @@ export class UsersService {
         { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '24h' },
       );
 
-      // Gửi email xác nhận
-      await this.mailService.sendActivationEmail(
+      const res = await this.mailService.sendActivationEmail(
         newUser.email,
         newUser._id.toString(),
         activationToken,
       );
-
       return newUser;
     } catch (error: any) {
       this.logger.error(`Failed to create user: ${error.message}`);
@@ -211,7 +209,11 @@ export class UsersService {
     return this.createMany(generatedUsers);
   }
 
-  async addVoucherToUser(userId: string, voucherId: string, vouchersService: any): Promise<UserDocument> {
+  async addVoucherToUser(
+    userId: string,
+    voucherId: string,
+    vouchersService: any,
+  ): Promise<UserDocument> {
     if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(voucherId)) {
       throw new BadRequestException('ID không hợp lệ');
     }
@@ -233,7 +235,10 @@ export class UsersService {
   }
 
   // Address methods
-  async addAddress(userId: string, addressData: CreateAddressDto): Promise<UserDocument> {
+  async addAddress(
+    userId: string,
+    addressData: CreateAddressDto,
+  ): Promise<UserDocument> {
     if (!Types.ObjectId.isValid(userId)) {
       throw new BadRequestException('ID user không hợp lệ');
     }
@@ -256,7 +261,11 @@ export class UsersService {
     return user;
   }
 
-  async updateAddress(userId: string, addressIndex: number, addressData: UpdateAddressDto): Promise<UserDocument> {
+  async updateAddress(
+    userId: string,
+    addressIndex: number,
+    addressData: UpdateAddressDto,
+  ): Promise<UserDocument> {
     if (!Types.ObjectId.isValid(userId)) {
       throw new BadRequestException('ID user không hợp lệ');
     }
@@ -266,7 +275,11 @@ export class UsersService {
       throw new NotFoundException('Không tìm thấy user');
     }
 
-    if (!user.addresses || addressIndex < 0 || addressIndex >= user.addresses.length) {
+    if (
+      !user.addresses ||
+      addressIndex < 0 ||
+      addressIndex >= user.addresses.length
+    ) {
       throw new BadRequestException('Index address không hợp lệ');
     }
 
@@ -280,7 +293,11 @@ export class UsersService {
     return user;
   }
 
-  async updateAddressById(userId: string, addressId: string, addressData: UpdateAddressDto): Promise<UserDocument> {
+  async updateAddressById(
+    userId: string,
+    addressId: string,
+    addressData: UpdateAddressDto,
+  ): Promise<UserDocument> {
     if (!Types.ObjectId.isValid(userId)) {
       throw new BadRequestException('ID user không hợp lệ');
     }
@@ -300,7 +317,7 @@ export class UsersService {
 
     // Tìm address theo _id
     const address = user.addresses.find(
-      addr => addr._id?.toString() === addressId
+      addr => addr._id?.toString() === addressId,
     );
 
     if (!address) {
@@ -317,7 +334,10 @@ export class UsersService {
     return user;
   }
 
-  async removeAddress(userId: string, addressId: string): Promise<UserDocument> {
+  async removeAddress(
+    userId: string,
+    addressId: string,
+  ): Promise<UserDocument> {
     if (!Types.ObjectId.isValid(userId)) {
       throw new BadRequestException('ID user không hợp lệ');
     }
@@ -337,7 +357,7 @@ export class UsersService {
 
     // Tìm và xóa address theo _id
     const addressIndex = user.addresses.findIndex(
-      address => address._id?.toString() === addressId
+      address => address._id?.toString() === addressId,
     );
 
     if (addressIndex === -1) {

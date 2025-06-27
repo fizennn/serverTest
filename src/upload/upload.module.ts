@@ -1,14 +1,18 @@
-
 // upload.module.ts
 import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
+import { MongooseModule } from '@nestjs/mongoose';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
+import { Upload, UploadSchema } from './schemas/upload.schema';
 
 @Module({
   imports: [
+    MongooseModule.forFeature([
+      { name: Upload.name, schema: UploadSchema }
+    ]),
     MulterModule.register({
       storage: diskStorage({
         destination: './uploads',
@@ -31,5 +35,6 @@ import { UploadService } from './upload.service';
   ],
   controllers: [UploadController],
   providers: [UploadService],
+  exports: [UploadService],
 })
 export class UploadModule {}

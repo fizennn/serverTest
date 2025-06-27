@@ -293,4 +293,23 @@ export class ProductsService {
       return totalStock + variantStock;
     }, 0);
   }
+
+  async findByCategory(categoryId: string, page?: string, limit?: string): Promise<PaginatedResponse<Product>> {
+    if (!Types.ObjectId.isValid(categoryId)) throw new BadRequestException('Category ID không hợp lệ');
+    const pageSize = parseInt(limit ?? '10');
+    const currentPage = parseInt(page ?? '1');
+    const filter = { category: categoryId };
+    const count = await this.productModel.countDocuments(filter);
+    const products = await this.productModel
+      .find(filter)
+      .limit(pageSize)
+      .skip(pageSize * (currentPage - 1));
+    if (!products.length) throw new NotFoundException('Không tìm thấy sản phẩm nào với category này');
+    return {
+      items: products,
+      total: count,
+      page: currentPage,
+      pages: Math.ceil(count / pageSize),
+    };
+  }
 }

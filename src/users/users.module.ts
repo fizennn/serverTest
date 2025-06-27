@@ -44,5 +44,6 @@ import { AdminGuard } from '../guards/admin.guard';
     JwtAuthGuard,
     AdminGuard
   ],
+  exports: [UsersService, MongooseModule],
 })
 export class UsersModule {}

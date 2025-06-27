@@ -12,6 +12,11 @@ import { AppController } from './controllers/app.controller';
 import { AppService } from './services/app.service';
 import { MailModule } from '../mail/mail.module';
 import { UploadModule } from '@/upload/upload.module';
+import { PostsModule } from '@/post/post.module';
+import { BannersModule } from '@/banner/banner.module';
+import { WebhookModule } from '@/webhooks/webhooks.module';
+import { CategoryModule } from '@/category/category.module';
+import { ReviewsModule } from '../reviews/reviews.module';
 
 @Module({
   imports: [
@@ -31,6 +36,11 @@ import { UploadModule } from '@/upload/upload.module';
     VouchersModule,
     UploadModule,
     MailModule,
+    CategoryModule,
+    PostsModule,
+    BannersModule,
+    WebhookModule,
+    ReviewsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
