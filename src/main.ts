@@ -12,7 +12,12 @@ async function bootstrap() {
     logger: ['error', 'warn', 'debug', 'log', 'verbose'],
   });
 
-  app.use(helmet());
+  app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }, // Cho phép cross-origin cho ảnh
+    contentSecurityPolicy: false, // hoặc cấu hình lại cho phù hợp
+  }),
+);
 
   // Cho phép tất cả domain truy cập
   app.enableCors({
