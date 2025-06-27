@@ -32,6 +32,12 @@ export class UploadService {
   async createUploadRecord(file: any, createUploadDto?: CreateUploadDto, uploadedBy?: string): Promise<UploadDocument> {
     const fileInfo = this.getFileInfo(file);
     
+    // Chỉ lưu tags là mảng 1 phần tử nếu có, không cần tách dấu phẩy
+    let tagsArr: string[] = [];
+    if (createUploadDto?.tags) {
+      tagsArr = [createUploadDto.tags.trim()];
+    }
+
     // Đảm bảo đường dẫn file được lưu chính xác
     const filePath = file.path || path.join(process.cwd(), 'uploads', file.filename);
     
@@ -39,7 +45,7 @@ export class UploadService {
       ...fileInfo,
       path: filePath,
       description: createUploadDto?.description,
-      tags: createUploadDto?.tags || [],
+      tags: tagsArr,
       uploadedBy,
       isActive: true,
     };

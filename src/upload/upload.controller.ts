@@ -57,9 +57,9 @@ export class UploadController {
           description: 'Mô tả file (tùy chọn)',
         },
         tags: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Thẻ phân loại file (tùy chọn)',
+          type: 'string',
+          description: 'Thẻ phân loại file (chuỗi, ví dụ: "product" hoặc "product,banner")',
+          example: 'product,banner',
         },
       },
       required: ['image'],

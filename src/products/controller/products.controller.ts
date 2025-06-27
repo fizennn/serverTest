@@ -186,4 +186,15 @@ export class ProductsController {
   ) {
     return this.productsService.findByCategory(categoryId, page, limit);
   }
+
+  @UseGuards(AdminGuard)
+  @Post('many')
+  @ApiOperation({ summary: 'Thêm nhiều sản phẩm cùng lúc (bulk)', description: 'Tạo nhiều sản phẩm, truyền vào một mảng ProductDto.' })
+  @ApiResponse({ status: 201, description: 'Tạo thành công', type: [ProductDto] })
+  async createManyProducts(@Body() products: ProductDto[]) {
+    if (!Array.isArray(products) || products.length === 0) {
+      throw new BadRequestException('Cần truyền vào một mảng sản phẩm hợp lệ!');
+    }
+    return this.productsService.createMany(products);
+  }
 }

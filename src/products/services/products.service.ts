@@ -85,8 +85,28 @@ export class ProductsService {
   }
 
   async createMany(products: Partial<Product>[]): Promise<ProductDocument[]> {
-    const createdProducts = await this.productModel.insertMany(products);
-
+    // Xử lý từng sản phẩm để tính averagePrice và countInStock
+    const processedProducts = products.map(productData => {
+      // Tính toán giá trung bình nếu có variants hoặc sử dụng giá được gửi lên
+      let averagePrice = productData.averagePrice || '0 - 0';
+      if (!productData.averagePrice && productData.variants && productData.variants.length > 0) {
+        averagePrice = this.calculateAveragePrice(productData.variants);
+      }
+      // Tính toán tổng số lượng tồn kho từ các biến thể
+      let countInStock = productData.countInStock || 0;
+      if (productData.variants && productData.variants.length > 0) {
+        countInStock = this.calculateTotalStock(productData.variants);
+      }
+      return {
+        ...productData,
+        averagePrice,
+        countInStock,
+        rating: 0,
+        numReviews: 0,
+        reviews: [],
+      };
+    });
+    const createdProducts = await this.productModel.insertMany(processedProducts);
     return createdProducts as unknown as ProductDocument[];
   }
 
@@ -113,6 +133,7 @@ export class ProductsService {
     product.brand = brand ?? product.brand;
     product.category = category ?? product.category;
     product.variants = attrs.variants ?? product.variants;
+    product.status = attrs.status ?? product.status;
 
     // Tính toán lại giá trung bình và tồn kho nếu có variants
     if (attrs.variants && attrs.variants.length > 0) {

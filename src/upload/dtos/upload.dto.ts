@@ -12,14 +12,13 @@ export class CreateUploadDto {
   description?: string;
 
   @ApiProperty({
-    description: 'Thẻ phân loại file',
-    example: ['product', 'banner', 'avatar'],
+    description: 'Thẻ phân loại file (chuỗi, ví dụ: "product" hoặc "product,banner")',
+    example: 'product,banner',
     required: false
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
+  @IsString()
+  tags?: string;
 }
 
 export class UpdateUploadDto extends PartialType(CreateUploadDto) {
