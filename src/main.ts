@@ -103,6 +103,14 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`Application is running on: ${await app.getUrl()}`);
+
+  // Tự động ping server mỗi 5 phútAdd commentMore actions
+  setInterval(() => {
+    const url = `https://fizennn.click/v1/products`;
+    fetch(url)
+      .then(() => console.log(`Pinged ${url} at ${new Date().toISOString()}`))
+      .catch((err) => console.error(`Ping failed: ${err}`));
+  }, 15 * 60 * 1000); // 5 phút
 }
 
 bootstrap();
