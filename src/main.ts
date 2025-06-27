@@ -45,8 +45,13 @@ async function bootstrap() {
     }),
   );
 
+
+
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/v1/uploads/',
+    setHeaders: (res, path) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    },
   });
 
   const config = new DocumentBuilder()
