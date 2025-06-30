@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import 'dotenv/config';More actions
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
@@ -12,7 +12,12 @@ async function bootstrap() {
     logger: ['error', 'warn', 'debug', 'log', 'verbose'],
   });
 
-  app.use(helmet());
+  app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }, // Cho phép cross-origin cho ảnh
+    contentSecurityPolicy: false, // hoặc cấu hình lại cho phù hợp
+  }),
+);
 
   // Cho phép tất cả domain truy cập
   app.enableCors({
@@ -45,8 +50,13 @@ async function bootstrap() {
     }),
   );
 
+
+
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/v1/uploads/',
+    setHeaders: (res, path) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    },
   });
 
   const config = new DocumentBuilder()
@@ -73,7 +83,7 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  
+
   // Áp dụng JWT cho tất cả các endpoints
   Object.keys(document.paths).forEach(path => {
     Object.keys(document.paths[path]).forEach(method => {
@@ -103,6 +113,14 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`Application is running on: ${await app.getUrl()}`);
+
+  // Tự động ping server mỗi 5 phútAdd commentMore actions
+  setInterval(() => {
+    const url = `https://fizennn.click/v1/products`;
+    fetch(url)
+      .then(() => console.log(`Pinged ${url} at ${new Date().toISOString()}`))
+      .catch((err) => console.error(`Ping failed: ${err}`));
+  }, 15 * 60 * 1000); // 5 phút
 }
 
 bootstrap();
