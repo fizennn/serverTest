@@ -20,6 +20,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "resend": "^4.6.0",
+    "mailersend": "^2.6.0",
+    "@emailjs/nodejs": "^5.0.2",
     "@faker-js/faker": "^9.8.0",
     "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/common": "^10.0.0",

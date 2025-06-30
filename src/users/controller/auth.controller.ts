@@ -213,7 +213,7 @@ export class AuthController {
     status: 400,
     description: 'UserId hoặc token không hợp lệ',
   })
-  @Post('activate')
+  @Get('activate')
   async activateAccount(
     @Query('userId') userId: string,
     @Query('token') token: string,

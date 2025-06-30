@@ -39,4 +39,40 @@ export class UpdateOrderDto {
   @IsOptional()
   @IsString()
   note?: string;
+}
+
+export class OrderResponseDto {
+  @ApiProperty({ description: 'ID của đơn hàng', example: '507f1f77bcf86cd799439011' })
+  _id: string;
+
+  @ApiProperty({ 
+    description: 'Thông tin người dùng',
+    type: 'object',
+    properties: {
+      _id: { type: 'string', example: '507f1f77bcf86cd799439012' },
+      name: { type: 'string', example: 'Nguyễn Văn A' },
+      email: { type: 'string', example: 'user@example.com' }
+    }
+  })
+  idUser: any;
+
+  @ApiProperty({ description: 'Trạng thái đơn hàng', example: 'pending' })
+  status: string;
+
+  @ApiProperty({ description: 'Tổng tiền đơn hàng', example: 940000 })
+  total: number;
+
+  @ApiProperty({ description: 'Ngày tạo đơn hàng', example: '2024-01-01T00:00:00.000Z' })
+  createdAt: Date;
+}
+
+export class PaginatedOrderResponseDto {
+  @ApiProperty({ type: [OrderResponseDto], description: 'Danh sách đơn hàng' })
+  data: OrderResponseDto[];
+
+  @ApiProperty({ example: 50, description: 'Tổng số lượng đơn hàng' })
+  total: number;
+
+  @ApiProperty({ example: 5, description: 'Tổng số trang' })
+  pages: number;
 } 

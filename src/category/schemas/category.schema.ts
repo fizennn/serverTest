@@ -11,6 +11,9 @@ export class Category extends Document {
 
   @Prop()
   imgUrl?: string;
+
+  @Prop({ default: true })
+  status: boolean;
 }
 
 export const CategorySchema = SchemaFactory.createForClass(Category); 

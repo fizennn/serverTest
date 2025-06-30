@@ -15,7 +15,7 @@ export class UploadService {
   ) {}
 
   generateFileUrl(filename: string): string {
-    const serverLink = 'https://fizennn.click/v1';
+    const serverLink = 'https://170.64.217.145/v1';
     return `${serverLink}/uploads/${filename}`;
   }
 

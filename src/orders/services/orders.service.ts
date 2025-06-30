@@ -113,12 +113,18 @@ export class OrdersService {
     // Tính toán discount từ voucher
     let itemDiscount = 0; // Giảm giá cho sản phẩm
     let shipDiscount = 0; // Giảm giá cho phí vận chuyển
-    const validVouchers = [];
+    const orderVouchers = [];
 
     if (vouchers && vouchers.length > 0) {
       for (const voucherId of vouchers) {
         if (!Types.ObjectId.isValid(voucherId)) {
           throw new BadRequestException(`Invalid voucher ID: ${voucherId}`);
+        }
+
+        // Lấy thông tin voucher từ database
+        const voucher = await this.voucherModel.findById(voucherId);
+        if (!voucher) {
+          throw new BadRequestException(`Voucher not found: ${voucherId}`);
         }
 
         // Sử dụng VouchersService để tính toán discount
@@ -137,15 +143,23 @@ export class OrdersService {
         itemDiscount += voucherResult.itemDiscount;
         shipDiscount += voucherResult.shipDiscount;
 
-        validVouchers.push(new Types.ObjectId(voucherId));
+        // Tạo snapshot voucher cho order
+        const orderVoucher = {
+          voucherId: voucherId,
+          type: voucher.type,
+          disCount: voucher.disCount,
+          condition: voucher.condition,
+          limit: voucher.limit,
+          appliedDiscount: voucherResult.itemDiscount + voucherResult.shipDiscount
+        };
+
+        orderVouchers.push(orderVoucher);
 
         // Giảm stock của voucher
-        if (voucherResult.voucher) {
-          await this.voucherModel.findByIdAndUpdate(
-            voucherId,
-            { $inc: { stock: -1 } }
-          );
-        }
+        await this.voucherModel.findByIdAndUpdate(
+          voucherId,
+          { $inc: { stock: -1 } }
+        );
       }
     }
 
@@ -171,26 +185,24 @@ export class OrdersService {
         storeAddress,
         shipCost: finalShipCost,
         status: 'pending',
+        vouchers: orderVouchers,
       };
-
-      // Thêm vouchers nếu có
-      if (validVouchers.length > 0) {
-        orderData['vouchers'] = validVouchers;
-      }
 
       // Log để debug
       console.log('Creating order with data:', JSON.stringify(orderData, null, 2));
       console.log('Subtotal:', subtotal, 'Item Discount:', itemDiscount, 'Ship Discount:', shipDiscount, 'Total:', total, 'At Store:', atStore, 'Payment:', payment);
 
       const createdOrder = await this.orderModel.create(orderData);
+      console.log('Created order:', createdOrder);
       
-      // Populate dữ liệu để trả về đầy đủ thông tin
+      // Populate dữ liệu để trả về đầy đủ thông tin (không cần populate voucher nữa)
       const populatedOrder = await this.orderModel
         .findById(createdOrder._id)
         .populate('idUser', 'name email')
         .populate('items.product', 'name images price')
-        .populate('vouchers', 'type disCount condition');
+        .exec();
 
+      console.log('Populated order vouchers:', populatedOrder.vouchers);
       return populatedOrder;
     } catch (error) {
       // Log lỗi để debug
@@ -199,14 +211,26 @@ export class OrdersService {
     }
   }
 
-  async findAll(): Promise<OrderDocument[]> {
-    const orders = await this.orderModel
-      .find()
-      .populate('idUser', 'name email')
-      .populate('items.product', 'name images price')
-      .populate('vouchers', 'code discount');
+  async findAll(page = 1, limit = 10): Promise<{ data: OrderDocument[], total: number, pages: number }> {
+    const skip = (page - 1) * limit;
+    
+    const [data, total] = await Promise.all([
+      this.orderModel
+        .find()
+        .populate('idUser', 'name email')
+        .populate('items.product', 'name images price')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.orderModel.countDocuments()
+    ]);
 
-    return orders;
+    return {
+      data,
+      total,
+      pages: Math.ceil(total / limit)
+    };
   }
 
   async findById(id: string): Promise<OrderDocument> {
@@ -217,7 +241,7 @@ export class OrdersService {
       .findById(id)
       .populate('idUser', 'name email')
       .populate('items.product', 'name images price')
-      .populate('vouchers', 'code discount');
+      .exec();
 
     if (!order) throw new NotFoundException('No order with given ID.');
 
@@ -280,25 +304,47 @@ export class OrdersService {
     return this.updateStatus(id, { status: 'cancelled' });
   }
 
-  async findUserOrders(userId: string): Promise<OrderDocument[]> {
-    const orders = await this.orderModel
-      .find({ idUser: userId })
-      .populate('items.product', 'name images price')
-      .populate('vouchers', 'code discount')
-      .sort({ createdAt: -1 });
+  async findUserOrders(userId: string, page = 1, limit = 10): Promise<{ data: OrderDocument[], total: number, pages: number }> {
+    const skip = (page - 1) * limit;
+    
+    const [data, total] = await Promise.all([
+      this.orderModel
+        .find({ idUser: userId })
+        .populate('items.product', 'name images price')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.orderModel.countDocuments({ idUser: userId })
+    ]);
 
-    return orders;
+    return {
+      data,
+      total,
+      pages: Math.ceil(total / limit)
+    };
   }
 
-  async findOrdersByStatus(status: string): Promise<OrderDocument[]> {
-    const orders = await this.orderModel
-      .find({ status })
-      .populate('idUser', 'name email')
-      .populate('items.product', 'name images price')
-      .populate('vouchers', 'code discount')
-      .sort({ createdAt: -1 });
+  async findOrdersByStatus(status: string, page = 1, limit = 10): Promise<{ data: OrderDocument[], total: number, pages: number }> {
+    const skip = (page - 1) * limit;
+    
+    const [data, total] = await Promise.all([
+      this.orderModel
+        .find({ status })
+        .populate('idUser', 'name email')
+        .populate('items.product', 'name images price')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.orderModel.countDocuments({ status })
+    ]);
 
-    return orders;
+    return {
+      data,
+      total,
+      pages: Math.ceil(total / limit)
+    };
   }
 
   async deleteOrder(id: string): Promise<void> {

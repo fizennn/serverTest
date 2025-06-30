@@ -16,7 +16,7 @@ import { CurrentUser } from '@/decorators/current-user.decorator';
 import { JwtAuthGuard } from '@/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { CreateOrderDto } from '../dtos/create-order.dto';
-import { UpdateOrderDto } from '../dtos/update-order.dto';
+import { UpdateOrderDto, PaginatedOrderResponseDto } from '../dtos/update-order.dto';
 
 @ApiTags('Đơn hàng')
 @Controller('orders')
@@ -78,13 +78,15 @@ export class OrdersController {
           items: {
             type: 'object',
             properties: {
-              _id: { type: 'string', example: '68565473537f64f28418e85c' },
-              type: { type: 'string', example: 'item', enum: ['item', 'ship'] },
-              disCount: { type: 'number', example: 10 },
-              condition: { type: 'number', example: 500000 },
-              limit: { type: 'number', example: 100000 }
+              voucherId: { type: 'string', example: '68565473537f64f28418e85c', description: 'ID của voucher' },
+              type: { type: 'string', example: 'item', enum: ['item', 'ship'], description: 'Loại voucher' },
+              disCount: { type: 'number', example: 10, description: 'Phần trăm giảm giá (%) tại thời điểm tạo order' },
+              condition: { type: 'number', example: 500000, description: 'Điều kiện tối thiểu (VNĐ) tại thời điểm tạo order' },
+              limit: { type: 'number', example: 100000, description: 'Giới hạn giảm giá tối đa (VNĐ) tại thời điểm tạo order' },
+              appliedDiscount: { type: 'number', example: 50000, description: 'Số tiền giảm giá thực tế được áp dụng' }
             }
-          }
+          },
+          description: 'Snapshot thông tin voucher tại thời điểm tạo order (không thay đổi sau này)'
         },
         subtotal: { type: 'number', example: 1000000, description: 'Tổng tiền sản phẩm trước giảm giá' },
         itemDiscount: { type: 'number', example: 50000, description: 'Tổng giảm giá cho sản phẩm' },
@@ -103,27 +105,62 @@ export class OrdersController {
 
   @UseGuards(AdminGuard)
   @Get()
-  @ApiOperation({ summary: 'Lấy tất cả đơn hàng (Admin)' })
-  @ApiResponse({ status: 200, description: 'Danh sách đơn hàng' })
-  async getOrders() {
-    return this.ordersService.findAll();
+  @ApiOperation({ 
+    summary: 'Lấy tất cả đơn hàng (Admin)',
+    description: 'Lấy danh sách tất cả đơn hàng có phân trang. Sắp xếp theo thời gian tạo mới nhất.'
+  })
+  @ApiQuery({ name: 'page', required: false, description: 'Trang hiện tại', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, description: 'Số lượng item trên mỗi trang', example: 10 })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Danh sách đơn hàng có phân trang',
+    type: PaginatedOrderResponseDto
+  })
+  async getOrders(@Query('page') page?: number, @Query('limit') limit?: number) {
+    return this.ordersService.findAll(page, limit);
   }
 
   @UseGuards(AdminGuard)
   @Get('status/:status')
-  @ApiOperation({ summary: 'Lấy đơn hàng theo trạng thái (Admin)' })
-  @ApiParam({ name: 'status', description: 'Trạng thái đơn hàng' })
-  @ApiResponse({ status: 200, description: 'Danh sách đơn hàng theo trạng thái' })
-  async getOrdersByStatus(@Param('status') status: string) {
-    return this.ordersService.findOrdersByStatus(status);
+  @ApiOperation({ 
+    summary: 'Lấy đơn hàng theo trạng thái (Admin)',
+    description: 'Lấy danh sách đơn hàng theo trạng thái có phân trang. Sắp xếp theo thời gian tạo mới nhất.'
+  })
+  @ApiParam({ name: 'status', description: 'Trạng thái đơn hàng', enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'] })
+  @ApiQuery({ name: 'page', required: false, description: 'Trang hiện tại', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, description: 'Số lượng item trên mỗi trang', example: 10 })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Danh sách đơn hàng theo trạng thái có phân trang',
+    type: PaginatedOrderResponseDto
+  })
+  async getOrdersByStatus(
+    @Param('status') status: string,
+    @Query('page') page?: number, 
+    @Query('limit') limit?: number
+  ) {
+    return this.ordersService.findOrdersByStatus(status, page, limit);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('myorders')
-  @ApiOperation({ summary: 'Lấy đơn hàng của người dùng hiện tại' })
-  @ApiResponse({ status: 200, description: 'Danh sách đơn hàng của user' })
-  async getUserOrders(@CurrentUser() user: UserDocument) {
-    return this.ordersService.findUserOrders(user._id.toString());
+  @ApiOperation({ 
+    summary: 'Lấy đơn hàng của người dùng hiện tại',
+    description: 'Lấy danh sách đơn hàng của user hiện tại có phân trang. Sắp xếp theo thời gian tạo mới nhất.'
+  })
+  @ApiQuery({ name: 'page', required: false, description: 'Trang hiện tại', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, description: 'Số lượng item trên mỗi trang', example: 10 })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Danh sách đơn hàng của user có phân trang',
+    type: PaginatedOrderResponseDto
+  })
+  async getUserOrders(
+    @CurrentUser() user: UserDocument,
+    @Query('page') page?: number, 
+    @Query('limit') limit?: number
+  ) {
+    return this.ordersService.findUserOrders(user._id.toString(), page, limit);
   }
 
   @UseGuards(JwtAuthGuard)

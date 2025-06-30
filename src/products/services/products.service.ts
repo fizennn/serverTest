@@ -73,6 +73,115 @@ export class ProductsService {
     };
   }
 
+  async findManyAdvanced(searchDto: any): Promise<PaginatedResponse<Product>> {
+    const {
+      keyword,
+      page = '1',
+      limit = '10',
+      brand,
+      category,
+      status,
+      minPrice,
+      maxPrice,
+      minRating,
+      inStock,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = searchDto;
+
+    const pageSize = parseInt(limit);
+    const currentPage = parseInt(page);
+
+    // Xây dựng query filter
+    let filter: any = {};
+
+    // Tìm kiếm theo từ khóa
+    if (keyword) {
+      const decodedKeyword = decodeURIComponent(keyword);
+      const searchPattern = decodedKeyword
+        .split(' ')
+        .map(term => `(?=.*${term})`)
+        .join('');
+      
+      filter.$or = [
+        { name: { $regex: searchPattern, $options: 'i' } },
+        { description: { $regex: searchPattern, $options: 'i' } },
+        { brand: { $regex: searchPattern, $options: 'i' } },
+        { category: { $regex: searchPattern, $options: 'i' } },
+      ];
+    }
+
+    // Filter theo brand
+    if (brand) {
+      filter.brand = { $regex: brand, $options: 'i' };
+    }
+
+    // Filter theo category
+    if (category) {
+      filter.category = category;
+    }
+
+    // Filter theo status
+    if (status !== undefined) {
+      filter.status = status === 'true';
+    }
+
+    // Filter theo khoảng giá
+    if (minPrice || maxPrice) {
+      filter.averagePrice = {};
+      if (minPrice) {
+        filter.averagePrice.$gte = minPrice;
+      }
+      if (maxPrice) {
+        filter.averagePrice.$lte = maxPrice;
+      }
+    }
+
+    // Filter theo rating
+    if (minRating) {
+      filter.rating = { $gte: parseFloat(minRating) };
+    }
+
+    // Filter theo tồn kho
+    if (inStock !== undefined) {
+      if (inStock === 'true') {
+        filter.countInStock = { $gt: 0 };
+      } else {
+        filter.countInStock = 0;
+      }
+    }
+
+    // Xây dựng sort
+    let sort: any = {};
+    const validSortFields = ['name', 'averagePrice', 'rating', 'createdAt', 'countInStock'];
+    const validSortOrders = ['asc', 'desc'];
+    
+    if (validSortFields.includes(sortBy) && validSortOrders.includes(sortOrder)) {
+      sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    } else {
+      sort.createdAt = -1; // Mặc định sắp xếp theo ngày tạo mới nhất
+    }
+
+    // Thực hiện query
+    const count = await this.productModel.countDocuments(filter);
+    const products = await this.productModel
+      .find(filter)
+      .sort(sort)
+      .limit(pageSize)
+      .skip(pageSize * (currentPage - 1));
+
+    if (!products.length && count > 0) {
+      throw new NotFoundException('No products found for current page.');
+    }
+
+    return {
+      items: products,
+      total: count,
+      page: currentPage,
+      pages: Math.ceil(count / pageSize),
+    };
+  }
+
   async findById(id: string): Promise<ProductDocument> {
     if (!Types.ObjectId.isValid(id))
       throw new BadRequestException('Invalid product ID.');

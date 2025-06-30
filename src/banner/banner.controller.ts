@@ -91,13 +91,7 @@ export class BannersController {
   })
   @ApiQuery({ name: 'page', required: false, description: 'Trang hiện tại', example: 1 })
   @ApiQuery({ name: 'limit', required: false, description: 'Số lượng banner mỗi trang', example: 10 })
-  @ApiQuery({ name: 'type', required: false, description: 'Lọc theo loại banner', enum: BannerType })
-  @ApiQuery({ name: 'position', required: false, description: 'Lọc theo vị trí', enum: BannerPosition })
   @ApiQuery({ name: 'isActive', required: false, description: 'Lọc theo trạng thái' })
-  @ApiQuery({ name: 'search', required: false, description: 'Tìm kiếm theo tiêu đề' })
-  @ApiQuery({ name: 'tag', required: false, description: 'Lọc theo tag' })
-  @ApiQuery({ name: 'sortBy', required: false, description: 'Sắp xếp theo', enum: ['createdAt', 'order', 'clickCount', 'viewCount'] })
-  @ApiQuery({ name: 'sortOrder', required: false, description: 'Thứ tự sắp xếp', enum: ['asc', 'desc'] })
   @ApiResponse({ 
     status: 200, 
     description: 'Danh sách banner',
@@ -176,8 +170,6 @@ export class BannersController {
     summary: 'Lấy danh sách banner public',
     description: 'Lấy danh sách banner đang active và trong thời gian hiển thị. Tự động tăng view count.'
   })
-  @ApiQuery({ name: 'type', required: false, description: 'Lọc theo loại banner', enum: BannerType })
-  @ApiQuery({ name: 'position', required: false, description: 'Lọc theo vị trí', enum: BannerPosition })
   @ApiResponse({ 
     status: 200, 
     description: 'Danh sách banner public',

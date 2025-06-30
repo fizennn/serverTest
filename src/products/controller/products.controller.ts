@@ -26,7 +26,7 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { AppService } from '@/app/services/app.service';
 import { Response } from 'express';
 import { ApiBearerAuth, ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
-import { VariantIdDto, SizeIdDto } from '../dtos/product.dto';
+import { VariantIdDto, SizeIdDto, ProductSearchDto } from '../dtos/product.dto';
 @ApiTags('Quản lý sản phẩm')
 @ApiBearerAuth('JWT-auth')
 @Controller('products')
@@ -37,12 +37,25 @@ export class ProductsController {
   ) {}
 
   @Get()
-  getProducts(
-    @Query('keyword') keyword: string,
-    @Query('page') page: string,
-    @Query('limit') limit: string,
-  ) {
-    return this.productsService.findMany(keyword, page, limit);
+  @ApiOperation({ 
+    summary: 'Tìm kiếm sản phẩm nâng cao',
+    description: 'Tìm kiếm sản phẩm với nhiều tiêu chí: từ khóa, brand, category, giá, rating, tồn kho, sắp xếp...'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Danh sách sản phẩm tìm thấy (có phân trang)',
+    schema: {
+      type: 'object',
+      properties: {
+        items: { type: 'array', items: { $ref: '#/components/schemas/Product' } },
+        total: { type: 'number', example: 100 },
+        page: { type: 'number', example: 1 },
+        pages: { type: 'number', example: 10 }
+      }
+    }
+  })
+  getProducts(@Query() searchDto: ProductSearchDto) {
+    return this.productsService.findManyAdvanced(searchDto);
   }
 
   @Get('topRated')
