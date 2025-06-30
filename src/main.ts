@@ -1,4 +1,4 @@
-import 'dotenv/config';More actions
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
@@ -117,7 +117,7 @@ async function bootstrap() {
   // Tự động ping server mỗi 5 phútAdd commentMore actions
   setInterval(() => {
     const url = `https://fizennn.click/v1/products`;
-    fetch(url)
+    fetch(url)Add commentMore actions
       .then(() => console.log(`Pinged ${url} at ${new Date().toISOString()}`))
       .catch((err) => console.error(`Ping failed: ${err}`));
   }, 15 * 60 * 1000); // 5 phút
