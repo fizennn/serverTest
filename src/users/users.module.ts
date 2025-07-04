@@ -28,21 +28,21 @@ import { AdminGuard } from '../guards/admin.guard';
     JwtModule.register({
       global: true,
       secret: process.env.JWT_ACCESS_SECRET,
-      signOptions: { expiresIn: '10m' },
+      signOptions: { expiresIn: '1y' },
     }),
     MailModule,
     VouchersModule,
   ],
   controllers: [AuthController, UsersController],
   providers: [
-    UsersService, 
-    AuthService, 
-    LocalStrategy, 
+    UsersService,
+    AuthService,
+    LocalStrategy,
     JwtStrategy,
     MailService,
     AddressAccessGuard,
     JwtAuthGuard,
-    AdminGuard
+    AdminGuard,
   ],
   exports: [UsersService, MongooseModule],
 })

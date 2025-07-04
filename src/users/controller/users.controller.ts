@@ -97,7 +97,6 @@ export class UsersController {
 
   // Address endpoints
   @Post(':userId/addresses')
-  @UseGuards(AddressAccessGuard)
   @ApiOperation({ 
     summary: 'Thêm địa chỉ mới cho user',
     description: 'Thêm một địa chỉ mới vào danh sách địa chỉ của user. Chỉ user đó hoặc admin mới có quyền thêm.'

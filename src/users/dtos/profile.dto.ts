@@ -4,6 +4,7 @@ import {
   MinLength,
   MaxLength,
   IsOptional,
+  ValidateIf,
 } from 'class-validator';
 
 export class ProfileDto {
@@ -13,13 +14,18 @@ export class ProfileDto {
   @IsOptional()
   name?: string;
 
-  @IsEmail({}, { message: 'Email address is not valid.' })
-  @IsOptional()
-  email?: string;
-
+  @ValidateIf(o => o.profilePicture !== undefined)
   @IsString()
-  @MinLength(5, { message: 'Password is too short.' })
-  @MaxLength(20, { message: 'Password is too long.' })
   @IsOptional()
-  password?: string;
+  profilePicture?: string;
+
+  @ValidateIf(o => o.country !== undefined)
+  @IsString()
+  @IsOptional()
+  country?: string;
+
+  @ValidateIf(o => o.dateOfBirth !== undefined)
+  @IsString()
+  @IsOptional()
+  dateOfBirth?: string; // có thể chuyển sang kiểu Date nếu backend xử lý, tạm thời để string
 }

@@ -150,20 +150,20 @@ export class UsersService {
       throw new BadRequestException('Invalid user ID');
     }
 
-    if (attrs.email) {
-      const existingUser = await this.findOne(attrs.email);
-      if (existingUser && existingUser._id.toString() !== id) {
-        throw new BadRequestException('Email is already in use');
+    // Chỉ lấy các trường cho phép cập nhật
+    const updateData: Partial<User> = {};
+    if (attrs.name !== undefined) updateData.name = attrs.name;
+    if (attrs.profilePicture !== undefined) updateData.profilePicture = attrs.profilePicture;
+    if (attrs.country !== undefined) updateData.country = attrs.country;
+    if (attrs.dateOfBirth !== undefined) {
+      if (typeof attrs.dateOfBirth === 'string') {
+        updateData.dateOfBirth = new Date(attrs.dateOfBirth);
+      } else {
+        updateData.dateOfBirth = attrs.dateOfBirth;
       }
     }
 
-    const updateData: Partial<User> = {
-      ...attrs,
-      isAdmin: isAdmin ? attrs.isAdmin : undefined,
-      password: attrs.password ? await hashPassword(attrs.password) : undefined,
-    };
-
-    // Remove undefined values
+    // Remove undefined values (phòng trường hợp truyền null)
     type UpdateKeys = keyof Partial<User>;
     Object.keys(updateData as Record<UpdateKeys, unknown>).forEach(
       key =>

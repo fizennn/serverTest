@@ -170,14 +170,27 @@ export class AuthController {
   @ApiOperation({
     summary: 'Cập nhật hồ sơ người dùng',
     description:
-      'Yêu cầu Bearer token. Nhập token từ /auth/login vào Authorize.',
+      'Yêu cầu Bearer token. Chỉ cho phép cập nhật các trường: name, profilePicture, country, dateOfBirth. Nhập token từ /auth/login vào Authorize.',
   })
   @ApiResponse({
     status: 200,
     description: 'Cập nhật hồ sơ thành công',
     type: UserDto,
   })
-  @ApiBody({ type: ProfileDto })
+  @ApiBody({
+    type: ProfileDto,
+    examples: {
+      default: {
+        summary: 'Ví dụ cập nhật profile',
+        value: {
+          name: 'Nguyen Van A',
+          profilePicture: 'https://example.com/avatar.jpg',
+          country: 'Vietnam',
+          dateOfBirth: '1990-01-01',
+        },
+      },
+    },
+  })
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @Put('profile')
@@ -185,7 +198,18 @@ export class AuthController {
     @CurrentUser() user: UserDocument,
     @Body() updateDto: ProfileDto,
   ) {
-    return this.usersService.update(user._id.toString(), updateDto);
+    // Chuyển dateOfBirth sang Date nếu có
+    const updateData: any = { ...updateDto };
+    if (updateData.dateOfBirth) {
+      // Hỗ trợ định dạng dd-mm-yyyy
+      if (/^\d{2}-\d{2}-\d{4}$/.test(updateData.dateOfBirth)) {
+        const [day, month, year] = updateData.dateOfBirth.split('-');
+        updateData.dateOfBirth = new Date(`${year}-${month}-${day}`);
+      } else {
+        updateData.dateOfBirth = new Date(updateData.dateOfBirth);
+      }
+    }
+    return this.usersService.update(user._id.toString(), updateData);
   }
 
   @ApiOperation({
