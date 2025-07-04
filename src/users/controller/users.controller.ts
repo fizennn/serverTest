@@ -19,6 +19,7 @@ import { UsersService } from '../services/users.service';
 import { PaginatedUsersDto } from '../dtos/paginated-users.dto';
 import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { VouchersService } from '../../vouchers/services/vouchers.service';
+import { JwtAuthGuard } from '@/guards/jwt-auth.guard';
 @ApiTags('Người dùng')
 @ApiBearerAuth('JWT-auth')
 @Controller('users')
@@ -97,6 +98,7 @@ export class UsersController {
 
   // Address endpoints
   @Post(':userId/addresses')
+  @UseGuards(JwtAuthGuard, AddressAccessGuard)
   @ApiOperation({ 
     summary: 'Thêm địa chỉ mới cho user',
     description: 'Thêm một địa chỉ mới vào danh sách địa chỉ của user. Chỉ user đó hoặc admin mới có quyền thêm.'
@@ -167,7 +169,7 @@ export class UsersController {
   }
 
   @Get(':userId/addresses')
-  @UseGuards(AddressAccessGuard)
+  @UseGuards(JwtAuthGuard, AddressAccessGuard)
   @ApiOperation({ 
     summary: 'Lấy danh sách địa chỉ của user',
     description: 'Lấy tất cả địa chỉ đã lưu của user. Chỉ user đó hoặc admin mới có quyền xem.'
@@ -203,7 +205,7 @@ export class UsersController {
   }
 
   @Put(':userId/addresses/:addressId')
-  @UseGuards(AddressAccessGuard)
+  @UseGuards(JwtAuthGuard, AddressAccessGuard)
   @ApiOperation({ 
     summary: 'Cập nhật địa chỉ của user theo ID',
     description: 'Cập nhật địa chỉ theo ID trong danh sách địa chỉ của user. Chỉ user đó hoặc admin mới có quyền cập nhật.'
@@ -242,7 +244,7 @@ export class UsersController {
   }
 
   @Delete(':userId/addresses/:addressId')
-  @UseGuards(AddressAccessGuard)
+  @UseGuards(JwtAuthGuard, AddressAccessGuard)
   @ApiOperation({ 
     summary: 'Xóa địa chỉ của user theo ID',
     description: 'Xóa địa chỉ theo ID trong danh sách địa chỉ của user. Chỉ user đó hoặc admin mới có quyền xóa.'
