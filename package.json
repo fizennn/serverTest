@@ -20,8 +20,6 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
-    "resend": "^4.6.0",
-    "mailersend": "^2.6.0",
     "@emailjs/nodejs": "^5.0.2",
     "@faker-js/faker": "^9.8.0",
     "@nestjs-modules/mailer": "^2.0.2",
@@ -44,6 +42,7 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "helmet": "^7.1.0",
+    "mailersend": "^2.6.0",
     "mongoose": "^8.0.3",
     "multer": "^2.0.1",
     "nestjs-command": "^3.1.5",
@@ -53,6 +52,7 @@
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "reflect-metadata": "^0.1.13",
+    "resend": "^4.6.0",
     "rxjs": "^7.8.1",
     "string-width": "^7.2.0",
     "stripe": "^14.7.0",
@@ -60,7 +60,7 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@nestjs/cli": "^10.0.0",
+    "@nestjs/cli": "^11.0.7",
     "@nestjs/schematics": "^10.0.0",
     "@nestjs/testing": "^10.0.0",
     "@types/bcryptjs": "^2.4.6",
