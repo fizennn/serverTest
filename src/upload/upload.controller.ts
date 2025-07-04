@@ -102,6 +102,45 @@ export class UploadController {
     };
   }
 
+  @Post('link')
+  @ApiBody({
+    description: 'Thêm link ảnh (không upload file)',
+    schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Link ảnh', example: 'https://example.com/image.jpg' },
+        description: { type: 'string', description: 'Mô tả file (tùy chọn)' },
+        tags: { type: 'string', description: 'Thẻ phân loại file (chuỗi, ví dụ: "product" hoặc "product,banner")', example: 'product,banner' },
+      },
+      required: ['url'],
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Thêm link ảnh thành công',
+    type: UploadImageResponseDto,
+  })
+  async addImageLink(
+    @Body() body: { url: string; description?: string; tags?: string },
+    @CurrentUser() user?: UserDocument,
+  ): Promise<UploadImageResponseDto> {
+    if (!body.url) {
+      throw new BadRequestException('Vui lòng nhập link ảnh!');
+    }
+    const uploadRecord = await this.uploadService.createImageLinkRecord(body, user?._id.toString());
+    return {
+      success: true,
+      message: 'Thêm link ảnh thành công!',
+      data: {
+        originalName: uploadRecord.originalName,
+        filename: uploadRecord.filename,
+        size: uploadRecord.size,
+        mimetype: uploadRecord.mimetype,
+        url: uploadRecord.url,
+      },
+    };
+  }
+
   @Get()
   @ApiQuery({ name: 'page', required: false, description: 'Trang hiện tại', example: 1 })
   @ApiQuery({ name: 'limit', required: false, description: 'Số lượng item mỗi trang', example: 10 })
