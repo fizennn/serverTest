@@ -19,7 +19,7 @@ export class UploadService {
     return `${serverLink}/uploads/${filename}`;
   }
 
-  getFileInfo(file: any) {
+    getFileInfo(file: any) {
     return {
       originalName: file.originalname,
       filename: file.filename,
@@ -227,5 +227,50 @@ export class UploadService {
     }
     
     return results;
+  }
+
+  async createImageLinkRecord(body: { url: string; description?: string; tags?: string }, uploadedBy?: string) {
+    // Giả lập thông tin file từ url
+    const url = body.url;
+    const filename = url.split('/').pop() || 'image-link';
+    const mimetype = this.getMimeTypeFromUrl(url);
+    const fileInfo = {
+      originalName: filename,
+      filename: filename,
+      size: 0,
+      mimetype: mimetype,
+      url: url,
+      path: url,
+    };
+    let tagsArr: string[] = [];
+    if (body.tags) {
+      tagsArr = [body.tags.trim()];
+    }
+    const uploadData = {
+      ...fileInfo,
+      description: body.description,
+      tags: tagsArr,
+      uploadedBy,
+      isActive: true,
+    };
+    const upload = new this.uploadModel(uploadData);
+    return await upload.save();
+  }
+
+  getMimeTypeFromUrl(url: string): string {
+    const ext = url.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      default:
+        return 'application/octet-stream';
+    }
   }
 }
