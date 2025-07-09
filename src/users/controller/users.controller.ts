@@ -177,6 +177,7 @@ export class UsersController {
   // Address endpoints
   @Post(':userId/addresses')
   @UseGuards(JwtAuthGuard, AddressAccessGuard)
+  @UseGuards(JwtAuthGuard, AddressAccessGuard)
   @ApiOperation({ 
     summary: 'Thêm địa chỉ mới cho user',
     description:
@@ -255,7 +256,7 @@ export class UsersController {
   }
 
   @Get(':userId/addresses')
-  @UseGuards(AddressAccessGuard)
+  @UseGuards(JwtAuthGuard, AddressAccessGuard)
   @ApiOperation({ 
     summary: 'Lấy danh sách địa chỉ của user',
     description:
@@ -299,7 +300,7 @@ export class UsersController {
   }
 
   @Put(':userId/addresses/:addressId')
-  @UseGuards(AddressAccessGuard)
+  @UseGuards(JwtAuthGuard, AddressAccessGuard)
   @ApiOperation({ 
     summary: 'Cập nhật địa chỉ của user theo ID',
     description:
@@ -349,7 +350,7 @@ export class UsersController {
   }
 
   @Delete(':userId/addresses/:addressId')
-  @UseGuards(AddressAccessGuard)
+  @UseGuards(JwtAuthGuard, AddressAccessGuard)
   @ApiOperation({ 
     summary: 'Xóa địa chỉ của user theo ID',
     description:
