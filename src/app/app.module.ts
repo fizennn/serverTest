@@ -17,6 +17,7 @@ import { BannersModule } from '@/banner/banner.module';
 import { WebhookModule } from '@/webhooks/webhooks.module';
 import { CategoryModule } from '@/category/category.module';
 import { ReviewsModule } from '../reviews/reviews.module';
+import { AnalyticsModule } from '@/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ReviewsModule } from '../reviews/reviews.module';
     }),
     CommandModule,
     ProductsModule,
+    AnalyticsModule,
     UsersModule,
     CartModule,
     OrderModule,

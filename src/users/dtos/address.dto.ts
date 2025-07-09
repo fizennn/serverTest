@@ -19,6 +19,16 @@ export class CreateAddressDto {
   @IsString()
   @IsNotEmpty()
   address!: string;
+
+
+  @ApiProperty({
+    description: 'Tên địa chỉ',
+    example: 'Nhà riêng',
+    type: String
+  })
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
 }
 
 export class UpdateAddressDto {

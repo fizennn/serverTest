@@ -9,6 +9,7 @@ export class AddressAccessGuard implements CanActivate {
 
     console.log(user);
     console.log(userId);
+    console.log(user._id.toString());
 
 
     // Nếu chưa đăng nhập hoặc không có user trên request
@@ -22,7 +23,7 @@ export class AddressAccessGuard implements CanActivate {
     }
 
     // Nếu là chính user đó thì cho phép
-    if (user.sub === userId) {
+    if (user._id.toString() === userId) {
       return true;
     }
 

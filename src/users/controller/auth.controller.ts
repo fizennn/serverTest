@@ -186,7 +186,7 @@ export class AuthController {
           name: 'Nguyen Van A',
           profilePicture: 'https://example.com/avatar.jpg',
           country: 'Vietnam',
-          dateOfBirth: '1990-01-01',
+          dateOfBirth: '01-01-1990',
         },
       },
     },

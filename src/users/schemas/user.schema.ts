@@ -7,6 +7,9 @@ export type UserDocument = HydratedDocument<User>;
 export class Address {
   _id?: string;
 
+  @Prop()
+  name: string;
+
   @Prop({ required: true })
   phone!: string;
 
@@ -50,7 +53,7 @@ export class User {
   postalCode?: string | null;
 
   @Prop({ type: Date, default: null })
-  dateOfBirth?: Date | null;
+  dateOfBirth?: Date | null | string;
 
   @Prop({ type: String, default: null })
   profilePicture?: string | null;

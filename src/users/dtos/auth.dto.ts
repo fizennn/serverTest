@@ -59,7 +59,7 @@ export class UserResponseDto {
   isActive?: boolean;
 
   @ApiProperty()
-  dateOfBirth?: Date;
+  dateOfBirth?: Date |string;
 
   @ApiProperty()
   lastLogin?: Date;

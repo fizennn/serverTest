@@ -17,13 +17,24 @@ import { UserDto } from '../dtos/user.dto';
 import { CreateAddressDto, UpdateAddressDto } from '../dtos/address.dto';
 import { UsersService } from '../services/users.service';
 import { PaginatedUsersDto } from '../dtos/paginated-users.dto';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+} from '@nestjs/swagger';
 import { VouchersService } from '../../vouchers/services/vouchers.service';
+import { JwtAuthGuard } from '@/guards/jwt-auth.guard';
+import { AddFavoriteProductDto } from '../dtos/add-favorite-product.dto';
 @ApiTags('Người dùng')
 @ApiBearerAuth('JWT-auth')
 @Controller('users')
 export class UsersController {
-  constructor(private usersService: UsersService, private vouchersService: VouchersService) {}
+  constructor(
+    private usersService: UsersService,
+    private vouchersService: VouchersService,
+  ) {}
 
   @Serialize(PaginatedUsersDto)
   @UseGuards(AdminGuard)
@@ -87,33 +98,103 @@ export class UsersController {
     },
   })
   @ApiResponse({ status: 201, description: 'Thêm voucher cho user thành công' })
-  @ApiResponse({ status: 400, description: 'Lỗi dữ liệu hoặc voucher không hợp lệ' })
+  @ApiResponse({
+    status: 400,
+    description: 'Lỗi dữ liệu hoặc voucher không hợp lệ',
+  })
   async addVoucherToUser(
     @Param('userId') userId: string,
     @Body('voucherId') voucherId: string,
   ) {
-    return this.usersService.addVoucherToUser(userId, voucherId, this.vouchersService);
+    return this.usersService.addVoucherToUser(
+      userId,
+      voucherId,
+      this.vouchersService,
+    );
+  }
+
+  @Post(':userId/favorite-products')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Thêm sản phẩm yêu thích cho user' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        productId: { type: 'string', example: '665f1e2b2c8b2a0012a4e123' },
+      },
+      required: ['productId'],
+    },
+    examples: {
+      'Thêm sản phẩm yêu thích': {
+        value: {
+          productId: '665f1e2b2c8b2a0012a4e123',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Thêm sản phẩm yêu thích thành công' })
+  @ApiResponse({ status: 400, description: 'Lỗi dữ liệu hoặc sản phẩm đã có trong danh sách yêu thích' })
+  async addFavoriteProduct(
+    @Param('userId') userId: string,
+    @Body() body: AddFavoriteProductDto,
+  ) {
+    return this.usersService.addFavoriteProduct(userId, body.productId);
+  }
+
+  @Delete(':userId/favorite-products/:productId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Xoá sản phẩm khỏi danh sách yêu thích' })
+  @ApiResponse({ status: 200, description: 'Xoá sản phẩm khỏi danh sách yêu thích thành công' })
+  @ApiResponse({ status: 400, description: 'Lỗi dữ liệu hoặc sản phẩm không có trong danh sách yêu thích' })
+  async removeFavoriteProduct(
+    @Param('userId') userId: string,
+    @Param('productId') productId: string,
+  ) {
+    return this.usersService.removeFavoriteProduct(userId, productId);
+  }
+
+  @Get(':userId/favorite-products/:productId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Kiểm tra sản phẩm có được yêu thích không' })
+  @ApiResponse({ status: 200, description: 'Trả về true/false' })
+  async isProductFavorited(
+    @Param('userId') userId: string,
+    @Param('productId') productId: string,
+  ) {
+    return { favorited: await this.usersService.isProductFavorited(userId, productId) };
+  }
+
+  @Get(':userId/favorite-products')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Lấy danh sách sản phẩm yêu thích của user' })
+  @ApiResponse({ status: 200, description: 'Danh sách id sản phẩm yêu thích' })
+  async getFavoriteProducts(
+    @Param('userId') userId: string,
+  ) {
+    return { favoriteProducts: await this.usersService.getFavoriteProducts(userId) };
   }
 
   // Address endpoints
   @Post(':userId/addresses')
+  @UseGuards(JwtAuthGuard, AddressAccessGuard)
   @ApiOperation({ 
     summary: 'Thêm địa chỉ mới cho user',
-    description: 'Thêm một địa chỉ mới vào danh sách địa chỉ của user. Chỉ user đó hoặc admin mới có quyền thêm.'
+    description:
+      'Thêm một địa chỉ mới vào danh sách địa chỉ của user. Chỉ user đó hoặc admin mới có quyền thêm.',
   })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        phone: { 
-          type: 'string', 
+        phone: {
+          type: 'string',
           example: '0123456789',
-          description: 'Số điện thoại người nhận'
+          description: 'Số điện thoại người nhận',
         },
-        address: { 
-          type: 'string', 
+        address: {
+          type: 'string',
           example: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM',
-          description: 'Địa chỉ chi tiết'
+          description: 'Địa chỉ chi tiết',
         },
       },
       required: ['phone', 'address'],
@@ -122,21 +203,21 @@ export class UsersController {
       'Địa chỉ nhà': {
         value: {
           phone: '0123456789',
-          address: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM'
+          address: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM',
         },
-        summary: 'Địa chỉ nhà riêng'
+        summary: 'Địa chỉ nhà riêng',
       },
       'Địa chỉ công ty': {
         value: {
           phone: '0987654321',
-          address: '456 Tòa nhà DEF, Phường UVW, Quận 3, TP.HCM'
+          address: '456 Tòa nhà DEF, Phường UVW, Quận 3, TP.HCM',
         },
-        summary: 'Địa chỉ công ty'
-      }
+        summary: 'Địa chỉ công ty',
+      },
     },
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Thêm địa chỉ thành công',
     schema: {
       type: 'object',
@@ -149,16 +230,23 @@ export class UsersController {
             type: 'object',
             properties: {
               phone: { type: 'string', example: '0123456789' },
-              address: { type: 'string', example: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM' }
-            }
-          }
-        }
-      }
-    }
+              address: {
+                type: 'string',
+                example: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM',
+              },
+            },
+          },
+        },
+      },
+    },
   })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy user' })
-  @ApiResponse({ status: 403, description: 'Không có quyền truy cập. Chỉ user đó hoặc admin mới có quyền thêm địa chỉ.' })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Không có quyền truy cập. Chỉ user đó hoặc admin mới có quyền thêm địa chỉ.',
+  })
   async addAddress(
     @Param('userId') userId: string,
     @Body() addressData: CreateAddressDto,
@@ -170,10 +258,11 @@ export class UsersController {
   @UseGuards(AddressAccessGuard)
   @ApiOperation({ 
     summary: 'Lấy danh sách địa chỉ của user',
-    description: 'Lấy tất cả địa chỉ đã lưu của user. Chỉ user đó hoặc admin mới có quyền xem.'
+    description:
+      'Lấy tất cả địa chỉ đã lưu của user. Chỉ user đó hoặc admin mới có quyền xem.',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lấy danh sách địa chỉ thành công',
     schema: {
       type: 'array',
@@ -181,23 +270,30 @@ export class UsersController {
         type: 'object',
         properties: {
           phone: { type: 'string', example: '0123456789' },
-          address: { type: 'string', example: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM' }
-        }
+          address: {
+            type: 'string',
+            example: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM',
+          },
+        },
       },
       example: [
         {
           phone: '0123456789',
-          address: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM'
+          address: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM',
         },
         {
           phone: '0987654321',
-          address: '456 Tòa nhà DEF, Phường UVW, Quận 3, TP.HCM'
-        }
-      ]
-    }
+          address: '456 Tòa nhà DEF, Phường UVW, Quận 3, TP.HCM',
+        },
+      ],
+    },
   })
   @ApiResponse({ status: 404, description: 'Không tìm thấy user' })
-  @ApiResponse({ status: 403, description: 'Không có quyền truy cập. Chỉ user đó hoặc admin mới có quyền xem địa chỉ.' })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Không có quyền truy cập. Chỉ user đó hoặc admin mới có quyền xem địa chỉ.',
+  })
   async getAddresses(@Param('userId') userId: string) {
     return this.usersService.getAddresses(userId);
   }
@@ -206,11 +302,12 @@ export class UsersController {
   @UseGuards(AddressAccessGuard)
   @ApiOperation({ 
     summary: 'Cập nhật địa chỉ của user theo ID',
-    description: 'Cập nhật địa chỉ theo ID trong danh sách địa chỉ của user. Chỉ user đó hoặc admin mới có quyền cập nhật.'
+    description:
+      'Cập nhật địa chỉ theo ID trong danh sách địa chỉ của user. Chỉ user đó hoặc admin mới có quyền cập nhật.',
   })
   @ApiBody({ type: UpdateAddressDto })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Cập nhật địa chỉ thành công',
     schema: {
       type: 'object',
@@ -223,16 +320,26 @@ export class UsersController {
             type: 'object',
             properties: {
               phone: { type: 'string', example: '0123456789' },
-              address: { type: 'string', example: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM' }
-            }
-          }
-        }
-      }
-    }
+              address: {
+                type: 'string',
+                example: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM',
+              },
+            },
+          },
+        },
+      },
+    },
   })
-  @ApiResponse({ status: 400, description: 'ID không hợp lệ hoặc dữ liệu không hợp lệ' })
+  @ApiResponse({
+    status: 400,
+    description: 'ID không hợp lệ hoặc dữ liệu không hợp lệ',
+  })
   @ApiResponse({ status: 404, description: 'Không tìm thấy user hoặc địa chỉ' })
-  @ApiResponse({ status: 403, description: 'Không có quyền truy cập. Chỉ user đó hoặc admin mới có quyền cập nhật địa chỉ.' })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Không có quyền truy cập. Chỉ user đó hoặc admin mới có quyền cập nhật địa chỉ.',
+  })
   async updateAddress(
     @Param('userId') userId: string,
     @Param('addressId') addressId: string,
@@ -245,10 +352,11 @@ export class UsersController {
   @UseGuards(AddressAccessGuard)
   @ApiOperation({ 
     summary: 'Xóa địa chỉ của user theo ID',
-    description: 'Xóa địa chỉ theo ID trong danh sách địa chỉ của user. Chỉ user đó hoặc admin mới có quyền xóa.'
+    description:
+      'Xóa địa chỉ theo ID trong danh sách địa chỉ của user. Chỉ user đó hoặc admin mới có quyền xóa.',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Xóa địa chỉ thành công',
     schema: {
       type: 'object',
@@ -261,16 +369,26 @@ export class UsersController {
             type: 'object',
             properties: {
               phone: { type: 'string', example: '0123456789' },
-              address: { type: 'string', example: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM' }
-            }
-          }
-        }
-      }
-    }
+              address: {
+                type: 'string',
+                example: '123 Đường ABC, Phường XYZ, Quận 1, TP.HCM',
+              },
+            },
+          },
+        },
+      },
+    },
   })
-  @ApiResponse({ status: 400, description: 'ID không hợp lệ hoặc user không có địa chỉ nào' })
+  @ApiResponse({
+    status: 400,
+    description: 'ID không hợp lệ hoặc user không có địa chỉ nào',
+  })
   @ApiResponse({ status: 404, description: 'Không tìm thấy user hoặc địa chỉ' })
-  @ApiResponse({ status: 403, description: 'Không có quyền truy cập. Chỉ user đó hoặc admin mới có quyền xóa địa chỉ.' })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Không có quyền truy cập. Chỉ user đó hoặc admin mới có quyền xóa địa chỉ.',
+  })
   async removeAddress(
     @Param('userId') userId: string,
     @Param('addressId') addressId: string,

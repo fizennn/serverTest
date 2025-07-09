@@ -27,11 +27,18 @@ export class OrderItem {
 
 @Schema({ _id: false })
 export class OrderVoucher {
-  @ApiProperty({ description: 'ID của voucher', example: '507f1f77bcf86cd799439011' })
+  @ApiProperty({
+    description: 'ID của voucher',
+    example: '507f1f77bcf86cd799439011',
+  })
   @Prop({ required: true })
   voucherId!: string;
 
-  @ApiProperty({ description: 'Loại voucher', example: 'item', enum: ['item', 'ship'] })
+  @ApiProperty({
+    description: 'Loại voucher',
+    example: 'item',
+    enum: ['item', 'ship'],
+  })
   @Prop({ required: true })
   type!: string;
 
@@ -39,15 +46,24 @@ export class OrderVoucher {
   @Prop({ required: true })
   disCount!: number;
 
-  @ApiProperty({ description: 'Điều kiện tối thiểu để sử dụng voucher (VNĐ)', example: 500000 })
+  @ApiProperty({
+    description: 'Điều kiện tối thiểu để sử dụng voucher (VNĐ)',
+    example: 500000,
+  })
   @Prop({ required: true })
   condition!: number;
 
-  @ApiProperty({ description: 'Giới hạn số tiền giảm giá tối đa (VNĐ)', example: 100000 })
+  @ApiProperty({
+    description: 'Giới hạn số tiền giảm giá tối đa (VNĐ)',
+    example: 100000,
+  })
   @Prop({ required: true })
   limit!: number;
 
-  @ApiProperty({ description: 'Số tiền giảm giá thực tế được áp dụng', example: 50000 })
+  @ApiProperty({
+    description: 'Số tiền giảm giá thực tế được áp dụng',
+    example: 50000,
+  })
   @Prop({ required: true })
   appliedDiscount!: number;
 }
@@ -111,6 +127,7 @@ export class Order {
   address!: {
     phone: string;
     address: string;
+    name: string;
   };
 
   @ApiProperty({
@@ -121,7 +138,8 @@ export class Order {
   items!: OrderItem[];
 
   @ApiProperty({
-    description: 'Danh sách voucher được áp dụng (snapshot tại thời điểm tạo order)',
+    description:
+      'Danh sách voucher được áp dụng (snapshot tại thời điểm tạo order)',
     type: [OrderVoucher],
     required: false,
   })
@@ -184,4 +202,3 @@ export class Order {
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
-

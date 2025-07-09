@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -25,11 +26,42 @@ export class OrdersService {
     private vouchersService: VouchersService,
   ) {}
 
+  async cancelUserOrder(orderId: string, userId: string) {
+    const order = await this.orderModel.findById(orderId);
+
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+
+    if (order.idUser.toString() !== userId) {
+      throw new ForbiddenException('Không có quyền hủy đơn hàng này');
+    }
+
+    if (!['pending', 'confirmed'].includes(order.status)) {
+      throw new BadRequestException(
+        'Không thể hủy đơn hàng ở trạng thái hiện tại',
+      );
+    }
+
+    order.status = 'cancelled';
+    await order.save();
+
+    return { message: 'Hủy đơn hàng thành công' };
+  }
   async create(
     orderAttrs: CreateOrderDto,
     userId: string,
   ): Promise<OrderDocument> {
-    const { items, address, note, vouchers, storeAddress, shipCost, atStore = false, payment = 'COD' } = orderAttrs;
+    const {
+      items,
+      address,
+      note,
+      vouchers,
+      storeAddress,
+      shipCost,
+      atStore = false,
+      payment = 'COD',
+    } = orderAttrs;
 
     if (items && items.length < 1)
       throw new BadRequestException('No order items received.');
@@ -40,7 +72,9 @@ export class OrdersService {
       throw new NotFoundException('User not found');
     }
 
-    const userAddress = user.addresses?.find(addr => addr._id?.toString() === address);
+    const userAddress = user.addresses?.find(
+      addr => addr._id?.toString() === address,
+    );
     if (!userAddress) {
       throw new BadRequestException('Address not found in user addresses');
     }
@@ -52,26 +86,32 @@ export class OrdersService {
     for (const item of items) {
       // Sử dụng method có sẵn để lấy thông tin sản phẩm theo sizeId
       const products = await this.productsService.findBySizeId(item.sizeId);
-      
+
       if (!products || products.length === 0) {
-        throw new BadRequestException(`Không tìm thấy sản phẩm với size ID ${item.sizeId}`);
+        throw new BadRequestException(
+          `Không tìm thấy sản phẩm với size ID ${item.sizeId}`,
+        );
       }
 
       // Lấy sản phẩm đầu tiên (vì findBySizeId trả về array)
       const filteredProduct = products[0];
-      
+
       // Lấy product gốc từ database để có thể save
       const product = await this.productModel.findById(filteredProduct._id);
       if (!product) {
-        throw new BadRequestException(`Không tìm thấy sản phẩm với ID ${filteredProduct._id}`);
+        throw new BadRequestException(
+          `Không tìm thấy sản phẩm với ID ${filteredProduct._id}`,
+        );
       }
-      
+
       // Tìm size cụ thể trong product
       let foundSize = null;
       let foundVariant = null;
-      
+
       for (const variant of product.variants) {
-        const size = variant.sizes.find((s: any) => s._id.toString() === item.sizeId);
+        const size = variant.sizes.find(
+          (s: any) => s._id.toString() === item.sizeId,
+        );
         if (size) {
           foundSize = size;
           foundVariant = variant;
@@ -80,12 +120,16 @@ export class OrdersService {
       }
 
       if (!foundSize) {
-        throw new BadRequestException(`Không tìm thấy size với ID ${item.sizeId}`);
+        throw new BadRequestException(
+          `Không tìm thấy size với ID ${item.sizeId}`,
+        );
       }
 
       // Kiểm tra số lượng tồn kho của size cụ thể
       if (item.quantity > foundSize.stock) {
-        throw new BadRequestException(`Not enough stock for size ${foundSize.size} of product ${product.name}. Available: ${foundSize.stock}`);
+        throw new BadRequestException(
+          `Not enough stock for size ${foundSize.size} of product ${product.name}. Available: ${foundSize.stock}`,
+        );
       }
 
       // Tính tổng tiền sản phẩm
@@ -128,15 +172,18 @@ export class OrdersService {
         }
 
         // Sử dụng VouchersService để tính toán discount
-        const voucherResult = await this.vouchersService.calculateVoucherDiscount(
-          voucherId,
-          userId,
-          subtotal,
-          finalShipCost
-        );
+        const voucherResult =
+          await this.vouchersService.calculateVoucherDiscount(
+            voucherId,
+            userId,
+            subtotal,
+            finalShipCost,
+          );
 
         if (!voucherResult.valid) {
-          throw new BadRequestException(`Voucher ${voucherId}: ${voucherResult.message}`);
+          throw new BadRequestException(
+            `Voucher ${voucherId}: ${voucherResult.message}`,
+          );
         }
 
         // Cộng dồn discount
@@ -150,16 +197,16 @@ export class OrdersService {
           disCount: voucher.disCount,
           condition: voucher.condition,
           limit: voucher.limit,
-          appliedDiscount: voucherResult.itemDiscount + voucherResult.shipDiscount
+          appliedDiscount:
+            voucherResult.itemDiscount + voucherResult.shipDiscount,
         };
 
         orderVouchers.push(orderVoucher);
 
         // Giảm stock của voucher
-        await this.voucherModel.findByIdAndUpdate(
-          voucherId,
-          { $inc: { stock: -1 } }
-        );
+        await this.voucherModel.findByIdAndUpdate(voucherId, {
+          $inc: { stock: -1 },
+        });
       }
     }
 
@@ -189,12 +236,28 @@ export class OrdersService {
       };
 
       // Log để debug
-      console.log('Creating order with data:', JSON.stringify(orderData, null, 2));
-      console.log('Subtotal:', subtotal, 'Item Discount:', itemDiscount, 'Ship Discount:', shipDiscount, 'Total:', total, 'At Store:', atStore, 'Payment:', payment);
+      console.log(
+        'Creating order with data:',
+        JSON.stringify(orderData, null, 2),
+      );
+      console.log(
+        'Subtotal:',
+        subtotal,
+        'Item Discount:',
+        itemDiscount,
+        'Ship Discount:',
+        shipDiscount,
+        'Total:',
+        total,
+        'At Store:',
+        atStore,
+        'Payment:',
+        payment,
+      );
 
       const createdOrder = await this.orderModel.create(orderData);
       console.log('Created order:', createdOrder);
-      
+
       // Populate dữ liệu để trả về đầy đủ thông tin (không cần populate voucher nữa)
       const populatedOrder = await this.orderModel
         .findById(createdOrder._id)
@@ -211,9 +274,12 @@ export class OrdersService {
     }
   }
 
-  async findAll(page = 1, limit = 10): Promise<{ data: OrderDocument[], total: number, pages: number }> {
+  async findAll(
+    page = 1,
+    limit = 10,
+  ): Promise<{ data: OrderDocument[]; total: number; pages: number }> {
     const skip = (page - 1) * limit;
-    
+
     const [data, total] = await Promise.all([
       this.orderModel
         .find()
@@ -223,13 +289,13 @@ export class OrdersService {
         .skip(skip)
         .limit(limit)
         .exec(),
-      this.orderModel.countDocuments()
+      this.orderModel.countDocuments(),
     ]);
 
     return {
       data,
       total,
-      pages: Math.ceil(total / limit)
+      pages: Math.ceil(total / limit),
     };
   }
 
@@ -269,7 +335,7 @@ export class OrdersService {
 
     if (updateData.atStore !== undefined) {
       order.atStore = updateData.atStore;
-      
+
       // Nếu chuyển sang mua tại cửa hàng, cập nhật phí ship về 0
       if (updateData.atStore) {
         order.shipCost = 0;
@@ -304,9 +370,13 @@ export class OrdersService {
     return this.updateStatus(id, { status: 'cancelled' });
   }
 
-  async findUserOrders(userId: string, page = 1, limit = 10): Promise<{ data: OrderDocument[], total: number, pages: number }> {
+  async findUserOrders(
+    userId: string,
+    page = 1,
+    limit = 10,
+  ): Promise<{ data: OrderDocument[]; total: number; pages: number }> {
     const skip = (page - 1) * limit;
-    
+
     const [data, total] = await Promise.all([
       this.orderModel
         .find({ idUser: userId })
@@ -315,19 +385,23 @@ export class OrdersService {
         .skip(skip)
         .limit(limit)
         .exec(),
-      this.orderModel.countDocuments({ idUser: userId })
+      this.orderModel.countDocuments({ idUser: userId }),
     ]);
 
     return {
       data,
       total,
-      pages: Math.ceil(total / limit)
+      pages: Math.ceil(total / limit),
     };
   }
 
-  async findOrdersByStatus(status: string, page = 1, limit = 10): Promise<{ data: OrderDocument[], total: number, pages: number }> {
+  async findOrdersByStatus(
+    status: string,
+    page = 1,
+    limit = 10,
+  ): Promise<{ data: OrderDocument[]; total: number; pages: number }> {
     const skip = (page - 1) * limit;
-    
+
     const [data, total] = await Promise.all([
       this.orderModel
         .find({ status })
@@ -337,13 +411,13 @@ export class OrdersService {
         .skip(skip)
         .limit(limit)
         .exec(),
-      this.orderModel.countDocuments({ status })
+      this.orderModel.countDocuments({ status }),
     ]);
 
     return {
       data,
       total,
-      pages: Math.ceil(total / limit)
+      pages: Math.ceil(total / limit),
     };
   }
 

@@ -14,6 +14,7 @@ import { PaginatedResponse } from '../../shared/types';
 import { MailService } from '@/mail/mail.service';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
+import { ProductsService } from '@/products/services/products.service';
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -22,6 +23,7 @@ export class UsersService {
     @InjectModel(User.name) private userModel: Model<User>,
     private mailService: MailService,
     private jwtService: JwtService,
+    private productsService: ProductsService,
   ) {}
 
   async resetPassword(email: string): Promise<void> {
@@ -234,6 +236,67 @@ export class UsersService {
     return user;
   }
 
+  async addFavoriteProduct(userId: string, productId: string): Promise<UserDocument> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid user ID');
+    }
+    // Có thể kiểm tra productId hợp lệ nếu cần
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+    if (user.favoriteProducts?.includes(productId)) {
+      throw new BadRequestException('Sản phẩm đã có trong danh sách yêu thích');
+    }
+    user.favoriteProducts = user.favoriteProducts || [];
+    user.favoriteProducts.push(productId);
+    await user.save();
+    return user;
+  }
+
+  async removeFavoriteProduct(userId: string, productId: string): Promise<UserDocument> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid user ID');
+    }
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+    if (!user.favoriteProducts?.includes(productId)) {
+      throw new BadRequestException('Sản phẩm không có trong danh sách yêu thích');
+    }
+    user.favoriteProducts = user.favoriteProducts.filter(id => id !== productId);
+    await user.save();
+    return user;
+  }
+
+  async isProductFavorited(userId: string, productId: string): Promise<boolean> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid user ID');
+    }
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+    return user.favoriteProducts?.includes(productId) || false;
+  }
+
+  async getFavoriteProducts(userId: string): Promise<any[]> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid user ID');
+    }
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+    const ids = user.favoriteProducts || [];
+    if (ids.length === 0) return [];
+    // Lấy chi tiết sản phẩm
+    const products = await Promise.all(ids.map(id => this.productsService.findById(id).catch(() => null)));
+    // Lọc ra các sản phẩm hợp lệ
+    return products.filter(p => p);
+  }
+
   // Address methods
   async addAddress(
     userId: string,
@@ -249,6 +312,7 @@ export class UsersService {
     }
 
     const newAddress: Address = {
+      name:addressData.name,
       phone: addressData.phone,
       address: addressData.address,
     };

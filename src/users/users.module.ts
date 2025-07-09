@@ -15,6 +15,7 @@ import { VouchersModule } from '../vouchers/vouchers.module';
 import { AddressAccessGuard } from '../guards/address-access.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { AdminGuard } from '../guards/admin.guard';
+import { ProductsModule } from '../products/products.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { AdminGuard } from '../guards/admin.guard';
     }),
     MailModule,
     VouchersModule,
+    ProductsModule,
   ],
   controllers: [AuthController, UsersController],
   providers: [
