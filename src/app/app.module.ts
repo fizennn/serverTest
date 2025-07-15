@@ -18,6 +18,7 @@ import { WebhookModule } from '@/webhooks/webhooks.module';
 import { CategoryModule } from '@/category/category.module';
 import { ReviewsModule } from '../reviews/reviews.module';
 import { AnalyticsModule } from '@/analytics/analytics.module';
+import { ChatbotModule } from '../chatbot/chatbot.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { AnalyticsModule } from '@/analytics/analytics.module';
     BannersModule,
     WebhookModule,
     ReviewsModule,
+    ChatbotModule,
   ],
   controllers: [AppController],
   providers: [AppService],

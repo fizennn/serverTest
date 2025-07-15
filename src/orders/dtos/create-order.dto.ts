@@ -52,10 +52,11 @@ export class CreateOrderDto {
   @ApiProperty({
     description: 'ID địa chỉ giao hàng (từ danh sách địa chỉ của user)',
     example: '68551835dc75515b71ad59c6',
+    required: false,
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  address!: string;
+  address?: string;
 
   @ApiProperty({
     description: 'Danh sách sản phẩm với số lượng',
@@ -90,16 +91,18 @@ export class CreateOrderDto {
   @ApiProperty({
     description: 'Địa chỉ cửa hàng',
     example: '123 Đường ABC, Quận 1, TP.HCM',
+    required: false,
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  storeAddress!: string;
+  storeAddress?: string;
 
   @ApiProperty({
     description: 'Phí vận chuyển',
     example: 30000,
+    required: false,
   })
+  @IsOptional()
   @IsNumber()
-  @IsNotEmpty()
-  shipCost!: number;
+  shipCost?: number;
 } 

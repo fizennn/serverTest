@@ -59,6 +59,9 @@ export class OrderResponseDto {
   @ApiProperty({ description: 'Trạng thái đơn hàng', example: 'pending' })
   status: string;
 
+  @ApiProperty({ description: 'Trạng thái thanh toán', example: 'unpaid', enum: ['unpaid', 'paid', 'refunded'] })
+  paymentStatus: string;
+
   @ApiProperty({ description: 'Tổng tiền đơn hàng', example: 940000 })
   total: number;
 

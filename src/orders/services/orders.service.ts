@@ -72,11 +72,17 @@ export class OrdersService {
       throw new NotFoundException('User not found');
     }
 
-    const userAddress = user.addresses?.find(
-      addr => addr._id?.toString() === address,
-    );
-    if (!userAddress) {
-      throw new BadRequestException('Address not found in user addresses');
+    let userAddress = null;
+    if (address) {
+      userAddress = user.addresses?.find(
+        addr => addr._id?.toString() === address,
+      );
+      if (!userAddress) {
+        throw new BadRequestException('Address not found in user addresses');
+      }
+    } else if (!atStore) {
+      // Nếu không phải mua tại cửa hàng thì phải có địa chỉ
+      throw new BadRequestException('Address is required for delivery orders');
     }
 
     // Lấy thông tin sản phẩm và tạo order items
@@ -152,7 +158,7 @@ export class OrdersService {
     }
 
     // Tính toán phí ship dựa trên atStore
-    const finalShipCost = atStore ? 0 : shipCost;
+    const finalShipCost = atStore ? 0 : (shipCost || 0);
 
     // Tính toán discount từ voucher
     let itemDiscount = 0; // Giảm giá cho sản phẩm
@@ -219,20 +225,21 @@ export class OrdersService {
         idUser: new Types.ObjectId(userId),
         atStore,
         payment,
-        address: {
+        address: userAddress ? {
           phone: userAddress.phone,
           address: userAddress.address,
-        },
+        } : null,
         items: orderItems,
         note: note || '',
         subtotal, // Tổng tiền sản phẩm trước khi giảm giá
         itemDiscount, // Giảm giá cho sản phẩm
         shipDiscount, // Giảm giá cho phí vận chuyển
         total,
-        storeAddress,
+        storeAddress: storeAddress || '',
         shipCost: finalShipCost,
         status: 'pending',
         vouchers: orderVouchers,
+        paymentStatus: 'unpaid',
       };
 
       // Log để debug
@@ -368,6 +375,16 @@ export class OrdersService {
 
   async updateToCancelled(id: string): Promise<OrderDocument> {
     return this.updateStatus(id, { status: 'cancelled' });
+  }
+
+  async updatePaymentStatus(id: string, paymentStatus: 'unpaid' | 'paid' | 'refunded') {
+    const order = await this.orderModel.findById(id);
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+    order.paymentStatus = paymentStatus;
+    await order.save();
+    return { message: 'Cập nhật trạng thái thanh toán thành công', paymentStatus };
   }
 
   async findUserOrders(

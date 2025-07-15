@@ -26,6 +26,12 @@ import {
   UpdateOrderDto,
   PaginatedOrderResponseDto,
 } from '../dtos/update-order.dto';
+import { ApiProperty } from '@nestjs/swagger';
+
+export class UpdatePaymentStatusDto {
+  @ApiProperty({ description: 'Trạng thái thanh toán', enum: ['unpaid', 'paid', 'refunded'], example: 'paid' })
+  paymentStatus: 'unpaid' | 'paid' | 'refunded';
+}
 
 @ApiTags('Đơn hàng')
 @Controller('orders')
@@ -367,6 +373,17 @@ export class OrdersController {
     @CurrentUser() user: UserDocument,
   ) {
     return this.ordersService.cancelUserOrder(id, user._id.toString());
+  }
+  @UseGuards(AdminGuard)
+  @Put(':id/payment-status')
+  @ApiOperation({ summary: 'Cập nhật trạng thái thanh toán đơn hàng (Admin)' })
+  @ApiParam({ name: 'id', description: 'ID đơn hàng' })
+  @ApiResponse({ status: 200, description: 'Cập nhật trạng thái thanh toán thành công' })
+  async updatePaymentStatus(
+    @Param('id') id: string,
+    @Body() body: UpdatePaymentStatusDto
+  ) {
+    return this.ordersService.updatePaymentStatus(id, body.paymentStatus);
   }
   @UseGuards(AdminGuard)
   @Delete(':id')

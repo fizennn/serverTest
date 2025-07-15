@@ -38,6 +38,11 @@ export class CreateVoucherDto {
   @IsArray()
   @IsOptional()
   userId?: string[];
+
+  @ApiProperty({ description: 'Trạng thái vô hiệu hóa', example: false, required: false, default: false })
+  @IsBoolean()
+  @IsOptional()
+  isDisable?: boolean;
 }
 
 export class UpdateVoucherDto {

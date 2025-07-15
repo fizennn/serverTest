@@ -116,15 +116,16 @@ export class Order {
 
   @ApiProperty({
     description: 'Địa chỉ giao hàng',
+    required: false,
   })
   @Prop({
-    required: true,
+    required: false,
     type: {
       phone: { type: String, required: true },
       address: { type: String, required: true },
     },
   })
-  address!: {
+  address?: {
     phone: string;
     address: string;
     name: string;
@@ -177,9 +178,10 @@ export class Order {
   @ApiProperty({
     description: 'Địa chỉ cửa hàng',
     example: '123 Đường ABC, Quận 1, TP.HCM',
+    required: false,
   })
-  @Prop({ required: true })
-  storeAddress!: string;
+  @Prop({ required: false })
+  storeAddress?: string;
 
   @ApiProperty({
     description: 'Phí vận chuyển',
@@ -199,6 +201,15 @@ export class Order {
     enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'],
   })
   status!: string;
+
+  @ApiProperty({
+    description: 'Trạng thái thanh toán',
+    example: 'unpaid',
+    enum: ['unpaid', 'paid', 'refunded'],
+    required: false,
+  })
+  @Prop({ required: false, default: 'unpaid', enum: ['unpaid', 'paid', 'refunded'] })
+  paymentStatus?: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

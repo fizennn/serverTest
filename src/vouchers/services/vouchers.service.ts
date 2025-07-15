@@ -15,7 +15,14 @@ export class VouchersService {
     if (createVoucherDto.end <= now) {
       throw new BadRequestException('Ngày kết thúc phải lớn hơn ngày hiện tại');
     }
-    const voucher = new this.voucherModel(createVoucherDto);
+    
+    // Set default value cho isDisable nếu không được cung cấp
+    const voucherData = {
+      ...createVoucherDto,
+      isDisable: createVoucherDto.isDisable ?? false
+    };
+    
+    const voucher = new this.voucherModel(voucherData);
     return await voucher.save();
   }
 
