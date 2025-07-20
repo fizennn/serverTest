@@ -5,7 +5,6 @@ import { Model } from 'mongoose';
 
 import {
   OrderOverviewDto,
-  RevenueByTimeDto,
   TopProductDto,
   RevenueByCategoryDto,
   LowStockProductDto,
@@ -91,81 +90,17 @@ export class AnalyticsService {
     };
   }
 
-  async getRevenueByTime(
+  async getTopProducts(
+    limit: number = 3,
     dateRange?: DateRangeQueryDto,
-  ): Promise<RevenueByTimeDto[]> {
+  ): Promise<TopProductDto[]> {
     const matchCondition = {
       ...this.buildDateFilter(dateRange),
       status: 'delivered',
     };
 
-    const timeType = dateRange?.timeType || 'month';
-    let groupFormat: any;
-    let sortFormat: string;
-
-    switch (timeType) {
-      case 'day':
-        groupFormat = {
-          year: { $year: '$createdAt' },
-          month: { $month: '$createdAt' },
-          day: { $dayOfMonth: '$createdAt' },
-        };
-        sortFormat = '%Y-%m-%d';
-        break;
-      case 'year':
-        groupFormat = {
-          year: { $year: '$createdAt' },
-        };
-        sortFormat = '%Y';
-        break;
-      default: // month
-        groupFormat = {
-          year: { $year: '$createdAt' },
-          month: { $month: '$createdAt' },
-        };
-        sortFormat = '%Y-%m';
-    }
-
     return await this.orderModel.aggregate([
       { $match: matchCondition },
-      {
-        $group: {
-          _id: groupFormat,
-          revenue: { $sum: '$total' },
-          orderCount: { $sum: 1 },
-        },
-      },
-      {
-        $addFields: {
-          period: {
-            $dateToString: {
-              format: sortFormat,
-              date: {
-                $dateFromParts: {
-                  year: '$_id.year',
-                  month: { $ifNull: ['$_id.month', 1] },
-                  day: { $ifNull: ['$_id.day', 1] },
-                },
-              },
-            },
-          },
-        },
-      },
-      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } },
-      {
-        $project: {
-          _id: 0,
-          period: 1,
-          revenue: 1,
-          orderCount: 1,
-        },
-      },
-    ]);
-  }
-
-  async getTopProducts(limit: number = 3): Promise<TopProductDto[]> {
-    return await this.orderModel.aggregate([
-      { $match: { status: 'delivered' } },
       { $unwind: '$items' },
       {
         $group: {
@@ -207,9 +142,16 @@ export class AnalyticsService {
     ]);
   }
 
-  async getRevenueByCategory(): Promise<RevenueByCategoryDto[]> {
+  async getRevenueByCategory(
+    dateRange?: DateRangeQueryDto,
+  ): Promise<RevenueByCategoryDto[]> {
+    const matchCondition = {
+      ...this.buildDateFilter(dateRange),
+      status: 'delivered',
+    };
+
     const categoryRevenue = await this.orderModel.aggregate([
-      { $match: { status: 'delivered' } },
+      { $match: matchCondition },
       { $unwind: '$items' },
       {
         $lookup: {
@@ -255,7 +197,6 @@ export class AnalyticsService {
           : 0,
     }));
   }
-
   async getLowStockProducts(
     threshold: number = 10,
   ): Promise<LowStockProductDto[]> {
@@ -283,10 +224,11 @@ export class AnalyticsService {
                       {
                         $map: {
                           input: '$$this.sizes',
+                          as: 'sizeItem', // Add alias for the size item
                           in: {
                             color: '$$this.color',
-                            size: '$$item.size',
-                            stock: '$$item.stock',
+                            size: '$$sizeItem.size', // Use the alias
+                            stock: '$$sizeItem.stock', // Use the alias
                           },
                         },
                       },
@@ -294,7 +236,8 @@ export class AnalyticsService {
                   },
                 },
               },
-              cond: { $lte: ['$$item.stock', threshold] },
+              as: 'variant', // Add alias for the variant item
+              cond: { $lte: ['$$variant.stock', threshold] }, // Use the alias
             },
           },
         },
@@ -323,9 +266,17 @@ export class AnalyticsService {
     return products;
   }
 
-  async getTopCustomers(limit: number = 10): Promise<TopCustomerDto[]> {
+  async getTopCustomers(
+    limit: number = 10,
+    dateRange?: DateRangeQueryDto,
+  ): Promise<TopCustomerDto[]> {
+    const matchCondition = {
+      ...this.buildDateFilter(dateRange),
+      status: 'delivered',
+    };
+
     return await this.orderModel.aggregate([
-      { $match: { status: 'delivered' } },
+      { $match: matchCondition },
       {
         $group: {
           _id: '$idUser',
@@ -362,9 +313,16 @@ export class AnalyticsService {
     ]);
   }
 
-  async getPaymentMethodStats(): Promise<PaymentMethodStatsDto[]> {
+  async getPaymentMethodStats(
+    dateRange?: DateRangeQueryDto,
+  ): Promise<PaymentMethodStatsDto[]> {
+    const matchCondition = {
+      ...this.buildDateFilter(dateRange),
+      status: 'delivered',
+    };
+
     const stats = await this.orderModel.aggregate([
-      { $match: { status: 'delivered' } },
+      { $match: matchCondition },
       {
         $group: {
           _id: '$payment',
@@ -388,9 +346,17 @@ export class AnalyticsService {
     }));
   }
 
-  async getVoucherUsageStats(): Promise<VoucherUsageDto[]> {
+  async getVoucherUsageStats(
+    dateRange?: DateRangeQueryDto,
+  ): Promise<VoucherUsageDto[]> {
+    const matchCondition = {
+      ...this.buildDateFilter(dateRange),
+      status: 'delivered',
+      'vouchers.0': { $exists: true },
+    };
+
     return await this.orderModel.aggregate([
-      { $match: { status: 'delivered', 'vouchers.0': { $exists: true } } },
+      { $match: matchCondition },
       { $unwind: '$vouchers' },
       {
         $group: {

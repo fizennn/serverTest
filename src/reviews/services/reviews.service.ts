@@ -128,7 +128,16 @@ export class ReviewsService {
     const total = review.comments.length;
     const start = (page - 1) * limit;
     const end = start + limit;
-    const reviews = review.comments.slice(start, end);
+    // Map lại để trả về thêm tên và ảnh user
+    const reviews = review.comments.slice(start, end).map((comment: any) => ({
+      _id: comment._id,
+      user: comment.user?._id ? comment.user._id : comment.user, // fallback nếu user bị xóa
+      userName: comment.user && comment.user.name ? comment.user.name : null,
+      userAvatar: comment.user && comment.user.profilePicture ? comment.user.profilePicture : null,
+      rating: comment.rating,
+      comment: comment.comment,
+      imgs: comment.imgs,
+    }));
     return { reviews, total, page, limit };
   }
 

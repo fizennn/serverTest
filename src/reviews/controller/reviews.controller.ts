@@ -42,17 +42,17 @@ export class ReviewsController {
     return comment;
   }
 
-  @Get('product/:productId')
-  @ApiOperation({ summary: 'Lấy review theo ID sản phẩm' })
-  @ApiResponse({ status: 200, description: 'Chi tiết review theo sản phẩm', type: ReviewDto })
-  @ApiResponse({ status: 404, description: 'Không tìm thấy review cho sản phẩm này' })
-  async findByProductId(@Param('productId') productId: string) {
-    const review = await this.reviewsService.findByProductId(productId);
-    if (!review) {
-      throw new NotFoundException('Không tìm thấy review cho sản phẩm này');
-    }
-    return review;
-  }
+  // @Get('product/:productId')
+  // @ApiOperation({ summary: 'Lấy review theo ID sản phẩm' })
+  // @ApiResponse({ status: 200, description: 'Chi tiết review theo sản phẩm', type: ReviewDto })
+  // @ApiResponse({ status: 404, description: 'Không tìm thấy review cho sản phẩm này' })
+  // async findByProductId(@Param('productId') productId: string) {
+  //   const review = await this.reviewsService.findByProductId(productId);
+  //   if (!review) {
+  //     throw new NotFoundException('Không tìm thấy review cho sản phẩm này');
+  //   }
+  //   return review;
+  // }
 
   @Put('product/:productId')
   @ApiOperation({ summary: 'Cập nhật review theo ID sản phẩm' })

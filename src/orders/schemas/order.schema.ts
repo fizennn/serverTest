@@ -6,7 +6,12 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export type OrderDocument = HydratedDocument<Order>;
 
-@Schema({ _id: false })
+export interface OrderWithTimestamps extends Order {
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+@Schema({ _id: true })
 export class OrderItem {
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
@@ -123,12 +128,13 @@ export class Order {
     type: {
       phone: { type: String, required: true },
       address: { type: String, required: true },
+      name: { type: String, required: false },
     },
   })
   address?: {
     phone: string;
     address: string;
-    name: string;
+    name?: string;
   };
 
   @ApiProperty({
@@ -206,10 +212,9 @@ export class Order {
     description: 'Trạng thái thanh toán',
     example: 'unpaid',
     enum: ['unpaid', 'paid', 'refunded'],
-    required: false,
   })
-  @Prop({ required: false, default: 'unpaid', enum: ['unpaid', 'paid', 'refunded'] })
-  paymentStatus?: string;
+  @Prop({ required: true, default: 'unpaid', enum: ['unpaid', 'paid', 'refunded'] })
+  paymentStatus!: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

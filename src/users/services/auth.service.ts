@@ -85,7 +85,7 @@ export class AuthService {
           type: 'access',
         } as TokenPayload,
         {
-          expiresIn: '30m',
+          expiresIn: '10y',
           secret: process.env.JWT_ACCESS_SECRET,
         },
       ),
@@ -98,7 +98,7 @@ export class AuthService {
           jti,
         } as TokenPayload,
         {
-          expiresIn: '7d',
+          expiresIn: '10y',
           secret: process.env.JWT_REFRESH_SECRET,
         },
       ),

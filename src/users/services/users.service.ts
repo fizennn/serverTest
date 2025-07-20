@@ -56,7 +56,7 @@ export class UsersService {
       // Tạo token kích hoạt
       const activationToken = this.jwtService.sign(
         { sub: newUser._id, type: 'activation' },
-        { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '24h' },
+        { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '10y' },
       );
 
       const res = await this.mailService.sendActivationEmail(

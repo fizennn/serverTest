@@ -9,13 +9,13 @@ export class AddressAccessGuard implements CanActivate {
 
     console.log(user);
     console.log(userId);
-    console.log(user._id.toString());
-
 
     // Nếu chưa đăng nhập hoặc không có user trên request
     if (!user) {
       throw new ForbiddenException('Token không hợp lệ hoặc đã hết hạn');
     }
+
+    console.log(user._id.toString());
 
     // Nếu là admin thì cho phép
     if (user.isAdmin) {

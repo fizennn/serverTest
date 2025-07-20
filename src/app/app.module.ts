@@ -19,6 +19,9 @@ import { CategoryModule } from '@/category/category.module';
 import { ReviewsModule } from '../reviews/reviews.module';
 import { AnalyticsModule } from '@/analytics/analytics.module';
 import { ChatbotModule } from '../chatbot/chatbot.module';
+import { PayOSModule } from '../payOS/payOS.module';
+import { ReturnOrdersModule } from '@/return-orders/return-orders.module';
+
 
 @Module({
   imports: [
@@ -45,6 +48,8 @@ import { ChatbotModule } from '../chatbot/chatbot.module';
     WebhookModule,
     ReviewsModule,
     ChatbotModule,
+    PayOSModule,
+    ReturnOrdersModule
   ],
   controllers: [AppController],
   providers: [AppService],

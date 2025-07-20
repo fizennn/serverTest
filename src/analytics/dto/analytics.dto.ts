@@ -1,6 +1,6 @@
 // analytics/dtos/analytics.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsDateString } from 'class-validator';
+import { IsOptional, IsDateString } from 'class-validator';
 
 export class DateRangeQueryDto {
   @ApiProperty({
@@ -20,17 +20,6 @@ export class DateRangeQueryDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
-
-  @ApiProperty({
-    description: 'Loại thời gian (day, month, year)',
-    example: 'month',
-    enum: ['day', 'month', 'year'],
-    default: 'month',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  timeType?: 'day' | 'month' | 'year';
 }
 
 export class OrderOverviewDto {
@@ -51,17 +40,6 @@ export class OrderOverviewDto {
 
   @ApiProperty({ description: 'Tỷ lệ thành công (%)', example: 78.4 })
   successRate: number;
-}
-
-export class RevenueByTimeDto {
-  @ApiProperty({ description: 'Nhãn thời gian', example: '2024-01' })
-  period: string;
-
-  @ApiProperty({ description: 'Doanh thu (VNĐ)', example: 12500000 })
-  revenue: number;
-
-  @ApiProperty({ description: 'Số đơn hàng', example: 125 })
-  orderCount: number;
 }
 
 export class TopProductDto {

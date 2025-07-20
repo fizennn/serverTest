@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
+@Schema()
 export class Comment {
   @Prop({ type: MongooseSchema.Types.ObjectId, default: () => new Types.ObjectId() })
   _id: Types.ObjectId;
@@ -18,12 +19,14 @@ export class Comment {
   imgs: string[];
 }
 
+export const CommentSchema = SchemaFactory.createForClass(Comment);
+
 @Schema({ timestamps: true })
 export class Review extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Product', required: true })
   product: Types.ObjectId;
 
-  @Prop({ type: [Object], default: [] })
+  @Prop({ type: [CommentSchema], default: [] })
   comments: Comment[];
 }
 
