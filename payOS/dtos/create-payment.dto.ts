@@ -1,0 +1,71 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { IsNumber, IsString, IsUrl, IsArray, ValidateNested, IsEmail, IsOptional } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class PayOSItemDto {
+  @ApiProperty({ example: 'Iphone', description: 'Tên sản phẩm' })
+  @IsString()
+  name: string;
+
+  @ApiProperty({ example: 2, description: 'Số lượng' })
+  @IsNumber()
+  quantity: number;
+
+  @ApiProperty({ example: 28000000, description: 'Giá sản phẩm' })
+  @IsNumber()
+  price: number;
+}
+
+export class CreatePaymentDto {
+  @ApiProperty({ example: 123, description: 'Mã đơn hàng (orderCode)' })
+  @IsNumber()
+  orderCode: number;
+
+  @ApiProperty({ example: 56000000, description: 'Số tiền thanh toán (VNĐ)' })
+  @IsNumber()
+  amount: number;
+
+  @ApiProperty({ example: 'VQRIO123', description: 'Mô tả đơn hàng' })
+  @IsString()
+  description: string;
+
+  @ApiProperty({ example: 'Nguyen Van A', description: 'Tên người mua' })
+  @IsString()
+  buyerName: string;
+
+  @ApiProperty({ example: 'buyer-email@gmail.com', description: 'Email người mua' })
+  @IsEmail()
+  buyerEmail: string;
+
+  @ApiProperty({ example: '090xxxxxxx', description: 'Số điện thoại người mua' })
+  @IsString()
+  buyerPhone: string;
+
+  @ApiProperty({ example: 'số nhà, đường, phường, tỉnh hoặc thành phố', description: 'Địa chỉ người mua' })
+  @IsString()
+  buyerAddress: string;
+
+  @ApiProperty({ type: [PayOSItemDto], description: 'Danh sách sản phẩm' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PayOSItemDto)
+  items: PayOSItemDto[];
+
+  @ApiProperty({ example: 'https://your-cancel-url.com', description: 'URL khi hủy thanh toán' })
+  @IsUrl()
+  cancelUrl: string;
+
+  @ApiProperty({ example: 'https://your-success-url.com', description: 'URL khi thanh toán thành công' })
+  @IsUrl()
+  returnUrl: string;
+
+  @ApiProperty({ example: 1718000000, description: 'Thời gian hết hạn (timestamp)', required: false })
+  @IsNumber()
+  @IsOptional()
+  expiredAt?: number;
+
+  @ApiProperty({ example: 'string', description: 'Chữ ký xác thực (signature)', required: false })
+  @IsString()
+  @IsOptional()
+  signature?: string;
+} 
