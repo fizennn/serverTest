@@ -164,8 +164,21 @@ export class ReturnOrdersService {
     console.log('Searching for return orders with userId:', userId);
     console.log('userId type:', typeof userId);
 
+    // Validate userId format
+    if (!userId || typeof userId !== 'string') {
+      throw new BadRequestException('User ID không hợp lệ');
+    }
+
+    // Check if userId is a valid ObjectId
+    if (!Types.ObjectId.isValid(userId)) {
+      console.log('Invalid ObjectId format for userId:', userId);
+      throw new BadRequestException('ID yêu cầu trả hàng không hợp lệ');
+    }
+
     // Convert userId to ObjectId for proper comparison
     const userObjectId = new Types.ObjectId(userId);
+
+    console.log('Converted userObjectId:', userObjectId);
 
     const [data, total] = await Promise.all([
       this.returnOrderModel

@@ -8,6 +8,7 @@ import {
   Put,
   Query,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -114,13 +115,40 @@ export class ReturnOrdersController {
     @Query('limit') limit?: number,
   ) {
     console.log('=== MY-RETURNS ENDPOINT CALLED ===');
-    console.log('Fetching return requests for user:', user._id.toString());
-    console.log('User ID type:', typeof user._id.toString());
-    console.log('User ID value:', user._id.toString());
+    console.log('User object:', user);
+    console.log('User _id:', user._id);
+    console.log('User _id type:', typeof user._id);
+    console.log('User _id toString:', user._id.toString());
+    console.log('User _id toString type:', typeof user._id.toString());
+    
+    // Validate user object
+    if (!user || !user._id) {
+      throw new BadRequestException('Thông tin người dùng không hợp lệ');
+    }
+
+    const userId = user._id.toString();
+    
+    // Validate userId format
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      throw new BadRequestException('ID người dùng không hợp lệ');
+    }
+
+    // Validate query parameters
+    const pageNumber = page ? parseInt(page.toString()) : 1;
+    const limitNumber = limit ? parseInt(limit.toString()) : 10;
+    
+    if (isNaN(pageNumber) || pageNumber < 1) {
+      throw new BadRequestException('Số trang không hợp lệ');
+    }
+    
+    if (isNaN(limitNumber) || limitNumber < 1 || limitNumber > 100) {
+      throw new BadRequestException('Số lượng item trên trang không hợp lệ');
+    }
+
     return this.returnOrdersService.getCustomerReturnRequests(
-      user._id.toString(),
-      page,
-      limit,
+      userId,
+      pageNumber,
+      limitNumber,
     );
   }
 
@@ -132,9 +160,25 @@ export class ReturnOrdersController {
   })
   async testMyReturns(@CurrentUser() user: UserDocument) {
     console.log('=== TEST ENDPOINT CALLED ===');
-    console.log('User ID:', user._id.toString());
+    console.log('User object:', user);
+    console.log('User _id:', user._id);
+    console.log('User _id type:', typeof user._id);
+    console.log('User _id toString:', user._id.toString());
+    
+    // Validate user object
+    if (!user || !user._id) {
+      throw new BadRequestException('Thông tin người dùng không hợp lệ');
+    }
+
+    const userId = user._id.toString();
+    
+    // Validate userId format
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      throw new BadRequestException('ID người dùng không hợp lệ');
+    }
+
     return this.returnOrdersService.getCustomerReturnRequests(
-      user._id.toString(),
+      userId,
       1,
       10,
     );
