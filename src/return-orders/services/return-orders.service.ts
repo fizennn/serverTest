@@ -161,17 +161,39 @@ export class ReturnOrdersService {
   ): Promise<{ data: ReturnOrderDocument[]; total: number; pages: number }> {
     const skip = (page - 1) * limit;
 
+    console.log('Searching for return orders with userId:', userId);
+    console.log('userId type:', typeof userId);
+
+    // Validate userId format
+    if (!userId || typeof userId !== 'string') {
+      throw new BadRequestException('User ID không hợp lệ');
+    }
+
+    // Check if userId is a valid ObjectId
+    if (!Types.ObjectId.isValid(userId)) {
+      console.log('Invalid ObjectId format for userId:', userId);
+      throw new BadRequestException('ID yêu cầu trả hàng không hợp lệ');
+    }
+
+    // Convert userId to ObjectId for proper comparison
+    const userObjectId = new Types.ObjectId(userId);
+
+    console.log('Converted userObjectId:', userObjectId);
+
     const [data, total] = await Promise.all([
       this.returnOrderModel
-        .find({ customerId: userId })
+        .find({ customerId: userObjectId })
         .populate('orderId', 'total createdAt status')
         .populate('items.productId', 'name images')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .exec(),
-      this.returnOrderModel.countDocuments({ customerId: userId }),
+      this.returnOrderModel.countDocuments({ customerId: userObjectId }),
     ]);
+
+    console.log('Found return orders:', data.length);
+    console.log('Total count:', total);
 
     return {
       data,
@@ -205,6 +227,22 @@ export class ReturnOrdersService {
       data,
       total,
       pages: Math.ceil(total / limit),
+    };
+  }
+
+  async debugAllReturns(): Promise<any> {
+    const allReturns = await this.returnOrderModel
+      .find({})
+      .populate('customerId', 'name email _id')
+      .populate('orderId', 'total createdAt status _id')
+      .exec();
+
+    console.log('All return orders in database:', allReturns.length);
+    console.log('Return orders data:', JSON.stringify(allReturns, null, 2));
+
+    return {
+      total: allReturns.length,
+      data: allReturns,
     };
   }
 

@@ -8,6 +8,7 @@ import {
   Put,
   Query,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { AdminGuard } from 'src/guards/admin.guard';
 import { AddressAccessGuard } from 'src/guards/address-access.guard';
@@ -23,6 +24,8 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBody,
+  ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { VouchersService } from '../../vouchers/services/vouchers.service';
 import { JwtAuthGuard } from '@/guards/jwt-auth.guard';
@@ -39,6 +42,62 @@ export class UsersController {
   @Serialize(PaginatedUsersDto)
   @UseGuards(AdminGuard)
   @Get()
+  @ApiOperation({ 
+    summary: 'Lấy danh sách tất cả người dùng',
+    description: 'Lấy danh sách tất cả người dùng trong hệ thống với phân trang',
+  })
+  @ApiQuery({
+    name: 'page',
+    description: 'Số trang',
+    required: false,
+    type: Number,
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Số lượng item mỗi trang',
+    required: false,
+    type: Number,
+    example: 20,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách users thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string', example: '665f1e2b2c8b2a0012a4e123' },
+              name: { type: 'string', example: 'John Doe' },
+              email: { type: 'string', example: 'john@example.com' },
+              isAdmin: { type: 'boolean', example: false },
+              isActive: { type: 'boolean', example: true },
+              roleId: { 
+                type: 'object', 
+                example: { 
+                  _id: '665f1e2b2c8b2a0012a4e123', 
+                  name: 'Customer',
+                  description: 'Khách hàng thông thường'
+                } 
+              },
+              createdAt: { type: 'string', format: 'date-time' },
+            },
+          },
+        },
+        total: { type: 'number', example: 100 },
+        page: { type: 'number', example: 1 },
+        pages: { type: 'number', example: 5 },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền xem danh sách users.',
+  })
   async getUsers(
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
@@ -47,6 +106,151 @@ export class UsersController {
     const limitNumber = parseInt(limit, 10);
 
     return this.usersService.findAll(pageNumber, limitNumber);
+  }
+
+  @Serialize(PaginatedUsersDto)
+  @UseGuards(AdminGuard)
+  @Get('admins')
+  @ApiOperation({ 
+    summary: 'Lấy tất cả admin',
+    description: 'Lấy danh sách tất cả người dùng có quyền admin (isAdmin = true)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách admin thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string', example: '665f1e2b2c8b2a0012a4e123' },
+              name: { type: 'string', example: 'Admin User' },
+              email: { type: 'string', example: 'admin@example.com' },
+              isAdmin: { type: 'boolean', example: true },
+              isActive: { type: 'boolean', example: true },
+              roleId: { 
+                type: 'object', 
+                example: { 
+                  _id: '665f1e2b2c8b2a0012a4e123', 
+                  name: 'Super Admin',
+                  description: 'Quản trị viên cấp cao',
+                  isOrder: true,
+                  isProduct: true,
+                  isCategory: true,
+                  isPost: true,
+                  isVoucher: true,
+                  isBanner: true,
+                  isAnalytic: true,
+                  isReturn: true,
+                  isUser: true
+                } 
+              },
+              createdAt: { type: 'string', format: 'date-time' },
+            },
+          },
+        },
+        total: { type: 'number', example: 5 },
+        page: { type: 'number', example: 1 },
+        pages: { type: 'number', example: 1 },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền xem danh sách admin.',
+  })
+  async getAdmins(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '20',
+  ) {
+    const pageNumber = parseInt(page, 10);
+    const limitNumber = parseInt(limit, 10);
+
+    return this.usersService.findAllAdmins(pageNumber, limitNumber);
+  }
+
+  @Serialize(PaginatedUsersDto)
+  @UseGuards(AdminGuard)
+  @Get('by-permission/:permission')
+  @ApiOperation({ 
+    summary: 'Lấy users theo quyền hạn',
+    description: 'Lấy danh sách người dùng có quyền hạn cụ thể (isProduct, isOrder, etc.)',
+  })
+  @ApiParam({
+    name: 'permission',
+    description: 'Tên quyền hạn cần tìm',
+    example: 'isProduct',
+    schema: {
+      type: 'string',
+      enum: ['isOrder', 'isProduct', 'isCategory', 'isPost', 'isVoucher', 'isBanner', 'isAnalytic', 'isReturn', 'isUser'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách users theo quyền hạn thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string', example: '665f1e2b2c8b2a0012a4e123' },
+              name: { type: 'string', example: 'Product Manager' },
+              email: { type: 'string', example: 'manager@example.com' },
+              isActive: { type: 'boolean', example: true },
+              roleId: { 
+                type: 'object', 
+                example: { 
+                  _id: '665f1e2b2c8b2a0012a4e123', 
+                  name: 'Product Manager',
+                  description: 'Quản lý sản phẩm và danh mục',
+                  isProduct: true,
+                  isCategory: true,
+                  isAnalytic: true
+                } 
+              },
+              createdAt: { type: 'string', format: 'date-time' },
+            },
+          },
+        },
+        total: { type: 'number', example: 10 },
+        page: { type: 'number', example: 1 },
+        pages: { type: 'number', example: 1 },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Tên quyền hạn không hợp lệ',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền xem danh sách users.',
+  })
+  async getUsersByPermission(
+    @Param('permission') permission: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '20',
+  ) {
+    // Validate permission name
+    const validPermissions = [
+      'isOrder', 'isProduct', 'isCategory', 'isPost', 
+      'isVoucher', 'isBanner', 'isAnalytic', 'isReturn', 'isUser'
+    ];
+    
+    if (!validPermissions.includes(permission)) {
+      throw new BadRequestException(`Quyền hạn không hợp lệ. Các quyền hợp lệ: ${validPermissions.join(', ')}`);
+    }
+
+    const pageNumber = parseInt(page, 10);
+    const limitNumber = parseInt(limit, 10);
+
+    return this.usersService.findAllByPermission(permission, pageNumber, limitNumber);
   }
 
   @UseGuards(AdminGuard)
@@ -58,6 +262,50 @@ export class UsersController {
   @Serialize(UserDto)
   @UseGuards(AdminGuard)
   @Get(':id')
+  @ApiOperation({ 
+    summary: 'Lấy thông tin chi tiết user',
+    description: 'Lấy thông tin chi tiết của một user theo ID',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID của user',
+    example: '665f1e2b2c8b2a0012a4e123',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy thông tin user thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        _id: { type: 'string', example: '665f1e2b2c8b2a0012a4e123' },
+        name: { type: 'string', example: 'John Doe' },
+        email: { type: 'string', example: 'john@example.com' },
+        isAdmin: { type: 'boolean', example: false },
+        isActive: { type: 'boolean', example: true },
+        roleId: { 
+          type: 'object', 
+          example: { 
+            _id: '665f1e2b2c8b2a0012a4e123', 
+            name: 'Customer',
+            description: 'Khách hàng thông thường'
+          } 
+        },
+        createdAt: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'ID không hợp lệ',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Không tìm thấy user',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền xem thông tin user.',
+  })
   getUser(@Param('id') id: string) {
     return this.usersService.findById(id);
   }
@@ -65,6 +313,62 @@ export class UsersController {
   @Serialize(UserDto)
   @UseGuards(AdminGuard)
   @Put(':id')
+  @ApiOperation({ 
+    summary: 'Cập nhật thông tin user',
+    description: 'Cập nhật thông tin của một user theo ID (chỉ admin). Có thể cập nhật status (isActive) và roleId.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID của user',
+    example: '665f1e2b2c8b2a0012a4e123',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', example: 'John Doe', description: 'Tên user' },
+        email: { type: 'string', example: 'john@example.com', description: 'Email user' },
+        isAdmin: { type: 'boolean', example: false, description: 'Quyền admin' },
+        isActive: { type: 'boolean', example: true, description: 'Trạng thái hoạt động' },
+        roleId: { type: 'string', example: '665f1e2b2c8b2a0012a4e123', description: 'ID của role' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật user thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        _id: { type: 'string', example: '665f1e2b2c8b2a0012a4e123' },
+        name: { type: 'string', example: 'John Doe' },
+        email: { type: 'string', example: 'john@example.com' },
+        isAdmin: { type: 'boolean', example: false },
+        isActive: { type: 'boolean', example: true },
+        roleId: { 
+          type: 'object', 
+          example: { 
+            _id: '665f1e2b2c8b2a0012a4e123', 
+            name: 'Customer',
+            description: 'Khách hàng thông thường'
+          } 
+        },
+        createdAt: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'ID không hợp lệ hoặc dữ liệu không hợp lệ',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Không tìm thấy user',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền cập nhật user.',
+  })
   async updateUser(
     @Param('id') id: string,
     @Body() credentials: AdminProfileDto,
@@ -395,4 +699,383 @@ export class UsersController {
   ) {
     return this.usersService.removeAddress(userId, addressId);
   }
+
+  // Quản lý quyền hạn
+  @Put(':userId/permissions')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiOperation({ 
+    summary: 'Cập nhật quyền hạn của user',
+    description: 'Cập nhật các quyền hạn của user. Chỉ admin mới có quyền cập nhật.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        isOrder: { type: 'boolean', example: true },
+        isProduct: { type: 'boolean', example: true },
+        isCategory: { type: 'boolean', example: true },
+        isPost: { type: 'boolean', example: true },
+        isVoucher: { type: 'boolean', example: true },
+        isBanner: { type: 'boolean', example: true },
+        isAnalytic: { type: 'boolean', example: true },
+        isReturn: { type: 'boolean', example: true },
+        isUser: { type: 'boolean', example: true },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật quyền hạn thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', example: 'Nguyễn Văn A' },
+        email: { type: 'string', example: 'user@example.com' },
+        isOrder: { type: 'boolean', example: true },
+        isProduct: { type: 'boolean', example: true },
+        isCategory: { type: 'boolean', example: true },
+        isPost: { type: 'boolean', example: true },
+        isVoucher: { type: 'boolean', example: true },
+        isBanner: { type: 'boolean', example: true },
+        isAnalytic: { type: 'boolean', example: true },
+        isReturn: { type: 'boolean', example: true },
+        isUser: { type: 'boolean', example: true },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'ID không hợp lệ',
+  })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy user' })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền cập nhật quyền hạn.',
+  })
+  async updatePermissions(
+    @Param('userId') userId: string,
+    @Body() permissions: {
+      isOrder?: boolean;
+      isProduct?: boolean;
+      isCategory?: boolean;
+      isPost?: boolean;
+      isVoucher?: boolean;
+      isBanner?: boolean;
+      isAnalytic?: boolean;
+      isReturn?: boolean;
+      isUser?: boolean;
+    },
+  ) {
+    return this.usersService.updatePermissions(userId, permissions);
+  }
+
+  @Get(':userId/permissions')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiOperation({ 
+    summary: 'Lấy quyền hạn của user',
+    description: 'Lấy danh sách quyền hạn của user. Chỉ admin mới có quyền xem.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy quyền hạn thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        isOrder: { type: 'boolean', example: true },
+        isProduct: { type: 'boolean', example: true },
+        isCategory: { type: 'boolean', example: false },
+        isPost: { type: 'boolean', example: false },
+        isVoucher: { type: 'boolean', example: true },
+        isBanner: { type: 'boolean', example: false },
+        isAnalytic: { type: 'boolean', example: true },
+        isReturn: { type: 'boolean', example: false },
+        isUser: { type: 'boolean', example: true },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'ID không hợp lệ',
+  })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy user' })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền xem quyền hạn.',
+  })
+  async getPermissions(@Param('userId') userId: string) {
+    return this.usersService.getPermissions(userId);
+  }
+
+  // Quản lý vai trò cho user
+  @Put(':userId/role')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiOperation({ 
+    summary: 'Gán vai trò cho user',
+    description: 'Gán vai trò cho user. Chỉ admin mới có quyền thực hiện.',
+  })
+  @ApiParam({
+    name: 'userId',
+    description: 'ID của user',
+    example: '665f1e2b2c8b2a0012a4e123',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        roleId: { type: 'string', example: '665f1e2b2c8b2a0012a4e123' },
+      },
+      required: ['roleId'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Gán vai trò thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        _id: { type: 'string', example: '665f1e2b2c8b2a0012a4e123' },
+        name: { type: 'string', example: 'John Doe' },
+        email: { type: 'string', example: 'john@example.com' },
+        isAdmin: { type: 'boolean', example: false },
+        isActive: { type: 'boolean', example: true },
+        roleId: { 
+          type: 'object', 
+          example: { 
+            _id: '665f1e2b2c8b2a0012a4e123', 
+            name: 'Product Manager',
+            description: 'Quản lý sản phẩm và danh mục',
+            isProduct: true,
+            isCategory: true,
+            isAnalytic: true
+          } 
+        },
+        createdAt: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'ID không hợp lệ',
+  })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy user hoặc role' })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền gán vai trò.',
+  })
+  async assignRole(
+    @Param('userId') userId: string,
+    @Body('roleId') roleId: string,
+  ) {
+    return this.usersService.assignRole(userId, roleId);
+  }
+
+  @Delete(':userId/role')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiOperation({ 
+    summary: 'Xóa vai trò của user',
+    description: 'Xóa vai trò hiện tại của user. Chỉ admin mới có quyền thực hiện.',
+  })
+  @ApiParam({
+    name: 'userId',
+    description: 'ID của user',
+    example: '665f1e2b2c8b2a0012a4e123',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Xóa vai trò thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        _id: { type: 'string', example: '665f1e2b2c8b2a0012a4e123' },
+        name: { type: 'string', example: 'John Doe' },
+        email: { type: 'string', example: 'john@example.com' },
+        isAdmin: { type: 'boolean', example: false },
+        isActive: { type: 'boolean', example: true },
+        roleId: { type: 'null', example: null },
+        createdAt: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'ID không hợp lệ',
+  })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy user' })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền xóa vai trò.',
+  })
+  async removeRole(@Param('userId') userId: string) {
+    return this.usersService.removeRole(userId);
+  }
+
+  // Lấy users theo vai trò
+  @Get('by-role/:roleId')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiOperation({ 
+    summary: 'Lấy users theo vai trò',
+    description: 'Lấy danh sách users có vai trò cụ thể',
+  })
+  @ApiParam({
+    name: 'roleId',
+    description: 'ID của vai trò',
+    example: '665f1e2b2c8b2a0012a4e123',
+  })
+  @ApiQuery({
+    name: 'page',
+    description: 'Số trang',
+    required: false,
+    type: Number,
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Số lượng item mỗi trang',
+    required: false,
+    type: Number,
+    example: 20,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách users theo vai trò thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string', example: '665f1e2b2c8b2a0012a4e123' },
+              name: { type: 'string', example: 'John Doe' },
+              email: { type: 'string', example: 'john@example.com' },
+              roleId: { type: 'object', example: { _id: '665f1e2b2c8b2a0012a4e123', name: 'Product Manager' } },
+              isActive: { type: 'boolean', example: true },
+              createdAt: { type: 'string', format: 'date-time' },
+            },
+          },
+        },
+        total: { type: 'number', example: 10 },
+        page: { type: 'number', example: 1 },
+        pages: { type: 'number', example: 1 },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'ID không hợp lệ',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền xem.',
+  })
+  async getUsersByRole(
+    @Param('roleId') roleId: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '20',
+  ) {
+    const pageNumber = parseInt(page, 10);
+    const limitNumber = parseInt(limit, 10);
+
+    return this.usersService.findAllByRole(roleId, pageNumber, limitNumber);
+  }
+
+  // Thống kê nhân viên
+  @Get('statistics/employees')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiOperation({ 
+    summary: 'Thống kê nhân viên',
+    description: 'Lấy thống kê chi tiết về nhân viên trong hệ thống',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy thống kê nhân viên thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        totalEmployees: { type: 'number', example: 25 },
+        activeEmployees: { type: 'number', example: 20 },
+        inactiveEmployees: { type: 'number', example: 5 },
+        employeesByRole: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string', example: '665f1e2b2c8b2a0012a4e123' },
+              count: { type: 'number', example: 8 },
+              roleName: { type: 'string', example: 'Product Manager' },
+            },
+          },
+        },
+        employeesByPermission: {
+          type: 'object',
+          properties: {
+            isOrder: { type: 'number', example: 15 },
+            isProduct: { type: 'number', example: 20 },
+            isCategory: { type: 'number', example: 12 },
+            isPost: { type: 'number', example: 8 },
+            isVoucher: { type: 'number', example: 10 },
+            isBanner: { type: 'number', example: 5 },
+            isAnalytic: { type: 'number', example: 18 },
+            isReturn: { type: 'number', example: 6 },
+            isUser: { type: 'number', example: 14 },
+          },
+        },
+        recentEmployees: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string', example: '665f1e2b2c8b2a0012a4e123' },
+              name: { type: 'string', example: 'John Doe' },
+              email: { type: 'string', example: 'john@example.com' },
+              isActive: { type: 'boolean', example: true },
+              createdAt: { type: 'string', format: 'date-time' },
+              roleId: { type: 'object', example: { _id: '665f1e2b2c8b2a0012a4e123', name: 'Product Manager' } },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền xem thống kê.',
+  })
+  async getEmployeeStatistics() {
+    return this.usersService.getEmployeeStatistics();
+  }
+
+  @Get('statistics/employee-activity')
+  @UseGuards(AdminGuard)
+  @ApiOperation({ 
+    summary: 'Thống kê hoạt động nhân viên',
+    description: 'Lấy thống kê hoạt động đăng nhập của nhân viên',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    description: 'Ngày bắt đầu (YYYY-MM-DD)',
+    required: false,
+    type: String,
+    example: '2024-01-01',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    description: 'Ngày kết thúc (YYYY-MM-DD)',
+    required: false,
+    type: String,
+    example: '2024-01-31',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy thống kê hoạt động nhân viên thành công',
+  })
+  async getEmployeeActivityStatistics(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const dateRange = startDate && endDate ? { startDate, endDate } : undefined;
+    return this.usersService.getEmployeeActivityStatistics(dateRange);
+  }
+
 }

@@ -33,42 +33,45 @@ export class AuthService {
   }
 
   async login(user: UserDocument): Promise<AuthResponseDto> {
-    const tokens = await this.generateTokens(user);
+    // Populate role trước khi tạo tokens
+    const userWithRole = await this.userModel.findById(user._id).populate('roleId');
     
-    // Populate vouchers data
+    const tokens = await this.generateTokens(userWithRole);
+    
+    // Populate vouchers data - lấy tất cả voucher mà user có quyền sử dụng
     let userVouchers = [];
-    if (user.vouchers && user.vouchers.length > 0) {
-      try {
-        const voucherPromises = user.vouchers.map(voucherId => 
-          this.vouchersService.findOne(voucherId.toString())
-        );
-        userVouchers = await Promise.all(voucherPromises);
-      } catch (error) {
-        // Nếu có lỗi khi lấy voucher, vẫn trả về user data nhưng không có voucher
-        console.error('Error fetching vouchers:', error);
-      }
+    try {
+      // Lấy tất cả voucher mà user có quyền sử dụng (user ID có trong userId array của voucher)
+      const vouchers = await this.vouchersService.findVouchersByUserId(user._id.toString());
+      userVouchers = vouchers; // Không filter isDisable nữa, lấy tất cả voucher của user
+      
+      console.log(`Successfully fetched ${userVouchers.length} vouchers for user ${user.email}`);
+    } catch (error) {
+      console.error('Error fetching vouchers:', error);
+      userVouchers = []; // Đảm bảo trả về array rỗng nếu có lỗi
     }
 
     return {
       tokens,
       user: {
-        id: user._id.toString(),
-        email: user.email,
-        name: user.name,
-        isAdmin: user.isAdmin,
-        profilePicture: user.profilePicture || '',
-        isActive:user.isActive,
-        loyaltyPoints: user.loyaltyPoints,
-        phoneNumber: user.phoneNumber,
-        address: user.address,
-        addresses: user.addresses,
-        city: user.city,
-        country: user.country,
-        postalCode: user.postalCode,
-        dateOfBirth: user.dateOfBirth,
-        lastLogin: user.lastLogin,
-        createdAt: user.createdAt,
+        id: userWithRole._id.toString(),
+        email: userWithRole.email,
+        name: userWithRole.name,
+        isAdmin: userWithRole.isAdmin,
+        profilePicture: userWithRole.profilePicture || '',
+        isActive: userWithRole.isActive,
+        loyaltyPoints: userWithRole.loyaltyPoints,
+        phoneNumber: userWithRole.phoneNumber,
+        address: userWithRole.address,
+        addresses: userWithRole.addresses,
+        city: userWithRole.city,
+        country: userWithRole.country,
+        postalCode: userWithRole.postalCode,
+        dateOfBirth: userWithRole.dateOfBirth,
+        lastLogin: userWithRole.lastLogin,
+        createdAt: userWithRole.createdAt,
         vouchers: userVouchers,
+        roleId: userWithRole.roleId,
       },
     };
   }

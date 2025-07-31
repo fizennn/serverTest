@@ -108,22 +108,28 @@ export class UserResponseDto {
     items: {
       type: 'object',
       properties: {
-        _id: { type: 'string' },
-        code: { type: 'string' },
-        name: { type: 'string' },
-        description: { type: 'string' },
-        disCount: { type: 'number' },
-        condition: { type: 'number' },
-        start: { type: 'string', format: 'date-time' },
-        end: { type: 'string', format: 'date-time' },
-        stock: { type: 'number' },
-        isDisable: { type: 'boolean' }
+        _id: { type: 'string', example: '507f1f77bcf86cd799439012' },
+        type: { type: 'string', example: 'item', enum: ['item', 'ship'], description: 'Loại voucher: item (giảm giá sản phẩm) hoặc ship (giảm giá vận chuyển)' },
+        disCount: { type: 'number', example: 10, description: 'Phần trăm giảm giá (%)' },
+        condition: { type: 'number', example: 500000, description: 'Điều kiện tối thiểu để sử dụng voucher (VNĐ)' },
+        limit: { type: 'number', example: 100000, description: 'Giới hạn số tiền giảm giá tối đa (VNĐ)' },
+        start: { type: 'string', format: 'date-time', example: '2024-01-01T00:00:00.000Z', description: 'Ngày bắt đầu hiệu lực' },
+        end: { type: 'string', format: 'date-time', example: '2024-12-31T23:59:59.999Z', description: 'Ngày kết thúc hiệu lực' },
+        stock: { type: 'number', example: 50, description: 'Số lượng voucher có sẵn' },
+        isDisable: { type: 'boolean', example: false, description: 'Trạng thái vô hiệu hóa' }
       }
     },
-    description: 'Danh sách voucher của user',
+    description: 'Danh sách tất cả voucher mà user có quyền sử dụng (bao gồm cả voucher bị disable)',
     required: false 
   })
   vouchers?: any[];
+
+  @ApiProperty({
+    description: 'ID của vai trò của user',
+    example: '665f1e2b2c8b2a0012a4e123',
+    required: false
+  })
+  roleId?: any;
 }
 
 export class AuthResponseDto {

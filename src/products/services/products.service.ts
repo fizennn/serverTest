@@ -445,4 +445,31 @@ export class ProductsService {
       pages: Math.ceil(count / pageSize),
     };
   }
+
+  async returnStock(productId: string, variantName: string, quantity: number): Promise<void> {
+    if (!Types.ObjectId.isValid(productId)) {
+      throw new BadRequestException('Invalid product ID');
+    }
+
+    const product = await this.productModel.findById(productId);
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // Tìm variant theo màu sắc
+    const variant = product.variants.find(v => v.color === variantName);
+    if (!variant) {
+      throw new NotFoundException('Variant not found');
+    }
+
+    // Cập nhật stock cho tất cả sizes trong variant
+    variant.sizes.forEach(size => {
+      size.stock += quantity;
+    });
+
+    // Cập nhật tổng stock của sản phẩm
+    product.countInStock = this.calculateTotalStock(product.variants);
+
+    await product.save();
+  }
 }

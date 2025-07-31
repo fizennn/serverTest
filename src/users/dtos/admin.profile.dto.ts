@@ -5,6 +5,7 @@ import {
   MaxLength,
   IsOptional,
   IsBoolean,
+  IsMongoId,
 } from 'class-validator';
 
 export class AdminProfileDto {
@@ -21,4 +22,12 @@ export class AdminProfileDto {
   @IsBoolean()
   @IsOptional()
   isAdmin?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+
+  @IsMongoId()
+  @IsOptional()
+  roleId?: string;
 }

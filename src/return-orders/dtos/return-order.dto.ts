@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsArray, IsOptional, IsNumber, Min, IsEnum, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class ReturnItemDto {
   @ApiProperty({ description: 'ID sản phẩm', example: '507f1f77bcf86cd799439013' })
@@ -8,6 +8,8 @@ export class ReturnItemDto {
   productId: string;
 
   @ApiProperty({ description: 'Số lượng trả', example: 1 })
+  @Transform(({ value }) => parseInt(value))
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   quantity: number;

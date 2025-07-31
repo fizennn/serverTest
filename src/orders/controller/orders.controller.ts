@@ -345,17 +345,17 @@ export class OrdersController {
     return this.ordersService.updateToDelivered(id);
   }
 
-  @UseGuards(AdminGuard)
+  @UseGuards(JwtAuthGuard)
   @Put(':id/cancel')
-  @ApiOperation({ summary: 'Hủy đơn hàng (Admin)' })
+  @ApiOperation({ summary: 'Hủy đơn hàng (User)' })
   @ApiParam({ name: 'id', description: 'ID đơn hàng' })
   @ApiResponse({ status: 200, description: 'Hủy đơn hàng thành công' })
-  async cancelOrder(@Param('id') id: string) {
-    return this.ordersService.updateToCancelled(id);
+  async cancelOrder(@Param('id') id: string, @CurrentUser() user: UserDocument) {
+    return this.ordersService.cancelUserOrder(id, user._id.toString());
   }
 
   @UseGuards(JwtAuthGuard)
-  @Put(':id/cancel')
+  @Put(':id/cancel-user')
   @ApiOperation({
     summary: 'Hủy đơn hàng (User)',
     description:

@@ -43,6 +43,35 @@ export class OrdersService {
       );
     }
 
+    // Hoàn trả voucher nếu có
+    if (order.vouchers && order.vouchers.length > 0) {
+      for (const voucherInfo of order.vouchers) {
+        try {
+          await this.vouchersService.returnVoucherUsage(
+            voucherInfo.voucherId.toString(),
+            userId,
+          );
+        } catch (error) {
+          console.error('Lỗi khi hoàn trả voucher:', error);
+          // Không throw error để không ảnh hưởng đến việc hủy đơn hàng
+        }
+      }
+    }
+
+    // Hoàn trả tồn kho
+    for (const item of order.items) {
+      try {
+        await this.productsService.returnStock(
+          item.product._id.toString(),
+          item.variant,
+          item.quantity,
+        );
+      } catch (error) {
+        console.error('Lỗi khi hoàn trả tồn kho:', error);
+        // Không throw error để không ảnh hưởng đến việc hủy đơn hàng
+      }
+    }
+
     order.status = 'cancelled';
     await order.save();
 

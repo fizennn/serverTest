@@ -173,4 +173,41 @@ export class UpdateUserDto {
   @Type(() => AddressDto)
   @IsOptional()
   addresses?: AddressDto[];
+
+  // Quyền hạn mới
+  @IsBoolean()
+  @IsOptional()
+  isOrder?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isProduct?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isCategory?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isPost?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isVoucher?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isBanner?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isAnalytic?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isReturn?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isUser?: boolean;
 }

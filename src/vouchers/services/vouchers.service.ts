@@ -42,9 +42,52 @@ export class VouchersService {
     return await this.voucherModel.find({
       start: { $lte: now },
       end: { $gte: now },
-      stock: { $gt: 0 },
       isDisable: false
     }).exec();
+  }
+
+  async findAllVouchers(): Promise<Voucher[]> {
+    return await this.voucherModel.find({}).exec();
+  }
+
+  async findVouchersByUserId(userId: string): Promise<Voucher[]> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid user ID');
+    }
+    
+    const userObjectId = new Types.ObjectId(userId);
+    
+    // Debug: Lấy tất cả voucher để kiểm tra
+    const allVouchers = await this.voucherModel.find({}).exec();
+    console.log(`Total vouchers in database: ${allVouchers.length}`);
+    
+    // Debug: Kiểm tra từng voucher
+    allVouchers.forEach((voucher, index) => {
+      console.log(`Voucher ${index + 1}:`, {
+        id: voucher._id,
+        type: voucher.type,
+        isDisable: voucher.isDisable,
+        userIdCount: voucher.userId?.length || 0,
+        userIds: voucher.userId?.map(id => id.toString()) || [],
+        hasUserAccess: voucher.userId?.some(id => id.equals(userObjectId)) || false
+      });
+    });
+    
+    // Lấy tất cả voucher có user ID (không filter isDisable)
+    const userVouchers = await this.voucherModel.find({
+      userId: { $in: [userObjectId] }
+    }).exec();
+    
+    console.log(`Found ${userVouchers.length} vouchers for user ${userId}`);
+    userVouchers.forEach((voucher, index) => {
+      console.log(`User voucher ${index + 1}:`, {
+        id: voucher._id,
+        type: voucher.type,
+        isDisable: voucher.isDisable
+      });
+    });
+    
+    return userVouchers;
   }
 
   async findOne(id: string): Promise<Voucher> {
@@ -161,6 +204,35 @@ export class VouchersService {
     voucher.stock += 1;
 
     return await voucher.save();
+  }
+
+  async removeVoucherFromUser(voucherId: string, userId: string): Promise<Voucher> {
+    if (!Types.ObjectId.isValid(voucherId) || !Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid voucher ID or user ID');
+    }
+
+    const voucher = await this.voucherModel.findById(voucherId).exec();
+    if (!voucher) {
+      throw new NotFoundException('Voucher not found');
+    }
+
+    const userObjectId = new Types.ObjectId(userId);
+    const userIndex = voucher.userId.findIndex(id => id.equals(userObjectId));
+    
+    if (userIndex === -1) {
+      throw new BadRequestException('User does not have access to this voucher');
+    }
+
+    // Xóa user khỏi voucher và tăng stock
+    voucher.userId.splice(userIndex, 1);
+    voucher.stock += 1;
+
+    return await voucher.save();
+  }
+
+  async returnVoucherUsage(voucherId: string, userId: string): Promise<Voucher> {
+    // Alias cho removeUserFromVoucher để hoàn trả voucher khi hủy đơn hàng
+    return this.removeUserFromVoucher(voucherId, userId);
   }
 
   async checkVoucherValidity(voucherId: string, userId: string, amount: number): Promise<{ valid: boolean; discount: number; message?: string }> {

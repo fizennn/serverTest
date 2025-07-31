@@ -21,7 +21,7 @@ import { AnalyticsModule } from '@/analytics/analytics.module';
 import { ChatbotModule } from '../chatbot/chatbot.module';
 import { PayOSModule } from '../payOS/payOS.module';
 import { ReturnOrdersModule } from '@/return-orders/return-orders.module';
-
+import { PermissionGuard } from '../guards/permission.guard';
 
 @Module({
   imports: [
@@ -52,6 +52,6 @@ import { ReturnOrdersModule } from '@/return-orders/return-orders.module';
     ReturnOrdersModule
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, PermissionGuard],
 })
 export class AppModule {}

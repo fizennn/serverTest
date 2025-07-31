@@ -2,13 +2,16 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthController } from './controller/auth.controller';
 import { User, UserSchema } from './schemas/user.schema';
+import { Role, RoleSchema } from './schemas/role.schema';
 import { UsersService } from './services/users.service';
+import { RoleService } from './services/role.service';
 import { AuthService } from './services/auth.service';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { LocalStrategy } from '../strategies/local.strategy';
 import { JwtStrategy } from 'src/strategies/jwt.strategy';
 import { UsersController } from './controller/users.controller';
+import { RoleController } from './controller/role.controller';
 import { MailService } from '@/mail/mail.service';
 import { MailModule } from '@/mail/mail.module';
 import { VouchersModule } from '../vouchers/vouchers.module';
@@ -24,6 +27,10 @@ import { ProductsModule } from '../products/products.module';
         name: User.name,
         schema: UserSchema,
       },
+      {
+        name: Role.name,
+        schema: RoleSchema,
+      },
     ]),
     PassportModule,
     JwtModule.register({
@@ -35,9 +42,10 @@ import { ProductsModule } from '../products/products.module';
     VouchersModule,
     ProductsModule,
   ],
-  controllers: [AuthController, UsersController],
+  controllers: [AuthController, UsersController, RoleController],
   providers: [
     UsersService,
+    RoleService,
     AuthService,
     LocalStrategy,
     JwtStrategy,
@@ -46,6 +54,6 @@ import { ProductsModule } from '../products/products.module';
     JwtAuthGuard,
     AdminGuard,
   ],
-  exports: [UsersService, MongooseModule],
+  exports: [UsersService, RoleService, MongooseModule],
 })
 export class UsersModule {}

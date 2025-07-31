@@ -46,12 +46,20 @@ export class AuthController {
   @ApiOperation({
     summary: 'Đăng nhập với email và password',
     description:
-      'Sao chép "accessToken" từ response và nhập vào Swagger Authorize (Bearer <token>).',
+      'Sao chép "accessToken" từ response và nhập vào Swagger Authorize (Bearer <token>). Response bao gồm thông tin user và danh sách tất cả voucher mà user có quyền sử dụng (bao gồm cả voucher bị disable).',
   })
   @ApiResponse({
     status: 200,
-    description: 'Đăng nhập thành công trả ra token',
+    description: 'Đăng nhập thành công trả ra token và thông tin user bao gồm voucher',
     type: AuthResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Email hoặc password không đúng',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Tài khoản chưa được kích hoạt',
   })
   @ApiBody({ type: LoginDto })
   @UseGuards(NotAuthenticatedGuard, LocalAuthGuard)

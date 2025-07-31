@@ -55,6 +55,67 @@ export class VouchersController {
     return this.vouchersService.findActive();
   }
 
+  @Get('all')
+  @ApiOperation({ 
+    summary: 'Lấy tất cả voucher (debug)',
+    description: 'Lấy tất cả voucher trong database để debug. Endpoint này hiển thị tất cả voucher bất kể trạng thái (active, disabled, expired).'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Tất cả voucher trong database',
+    type: [VoucherResponseDto]
+  })
+  findAllVouchers() {
+    return this.vouchersService.findAllVouchers();
+  }
+
+  @Get('user/:userId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Lấy danh sách voucher của user',
+    description: 'Lấy tất cả voucher mà user có quyền sử dụng (user ID có trong danh sách userId của voucher). Bao gồm cả voucher bị disable.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Danh sách voucher của user',
+    type: [VoucherResponseDto]
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'User ID không hợp lệ' 
+  })
+  findVouchersByUserId(@Param('userId') userId: string) {
+    return this.vouchersService.findVouchersByUserId(userId);
+  }
+
+  @Delete('user/:userId/voucher/:voucherId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Xóa voucher khỏi user',
+    description: 'Xóa quyền sử dụng voucher của user. Voucher sẽ được trả lại stock và user không thể sử dụng voucher này nữa.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Xóa voucher khỏi user thành công',
+    type: VoucherResponseDto
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'Voucher ID hoặc User ID không hợp lệ, hoặc user không có quyền sử dụng voucher này' 
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'Voucher không tồn tại' 
+  })
+  removeVoucherFromUser(
+    @Param('userId') userId: string,
+    @Param('voucherId') voucherId: string
+  ) {
+    return this.vouchersService.removeVoucherFromUser(voucherId, userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Lấy thông tin voucher theo ID' })
   @ApiResponse({ status: 200, description: 'Thông tin voucher', type: VoucherResponseDto })

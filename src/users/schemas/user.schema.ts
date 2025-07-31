@@ -75,6 +75,10 @@ export class User {
 
   @Prop({ type: [Address], default: [] })
   addresses?: Address[];
+
+  // Vai trò - quyền hạn sẽ được lấy từ role thay vì từ các thuộc tính trực tiếp
+  @Prop({ type: 'ObjectId', ref: 'Role', default: null })
+  roleId?: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
