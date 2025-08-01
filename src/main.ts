@@ -6,18 +6,20 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { join } from 'path';
+import * as express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['error', 'warn', 'debug', 'log', 'verbose'],
   });
 
-  app.use(
-  helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' }, // Cho phép cross-origin cho ảnh
-    contentSecurityPolicy: false, // hoặc cấu hình lại cho phù hợp
-  }),
-);
+  app.use(helmet());
+
+  // Cấu hình raw body cho webhook Stripe - ĐẶT TRƯỚC CORS
+  app.use('/stripe/webhook', express.raw({ 
+    type: 'application/json',
+    limit: '10mb' // Tăng limit để đảm bảo nhận được đầy đủ webhook data
+  }));
 
   // Cho phép tất cả domain truy cập
   app.enableCors({
@@ -29,7 +31,8 @@ async function bootstrap() {
       'Authorization', 
       'X-Requested-With',
       'Accept',
-      'Origin'
+      'Origin',
+      'stripe-signature' // Thêm header cho Stripe webhook
     ],
     exposedHeaders: ['Content-Range', 'X-Content-Range'],
   });
@@ -50,13 +53,8 @@ async function bootstrap() {
     }),
   );
 
-
-
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/v1/uploads/',
-    setHeaders: (res, path) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-    },
   });
 
   const config = new DocumentBuilder()
@@ -113,14 +111,6 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`Application is running on: ${await app.getUrl()}`);
-
-  // Tự động ping server mỗi 5 phútAdd commentMore actions
-  setInterval(() => {
-    const url = `https://fizennn.click/v1/products`;
-    fetch(url)
-      .then(() => console.log(`Pinged ${url} at ${new Date().toISOString()}`))
-      .catch((err) => console.error(`Ping failed: ${err}`));
-  }, 15 * 60 * 1000); // 5 phút
 }
 
 bootstrap();
