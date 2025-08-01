@@ -168,14 +168,35 @@ export class StripeService {
   }
 
   verifyWebhookSignature(payload: any, signature: string, endpointSecret: string): boolean {
-    this.logger.log(`Verifying webhook signature - Endpoint secret: ${endpointSecret.substring(0, 10)}...`);
+    this.logger.log(`[VERIFY] Starting webhook signature verification`);
+    this.logger.log(`[VERIFY] Endpoint secret length: ${endpointSecret.length}`);
+    this.logger.log(`[VERIFY] Signature length: ${signature.length}`);
+    this.logger.log(`[VERIFY] Payload type: ${typeof payload}`);
+    this.logger.log(`[VERIFY] Payload length: ${payload?.length || 0}`);
     
     try {
-      this.stripe.webhooks.constructEvent(payload, signature, endpointSecret);
-      this.logger.log('Webhook signature verification successful');
+      // Đảm bảo payload là Buffer
+      const payloadBuffer = Buffer.isBuffer(payload) ? payload : Buffer.from(payload);
+      
+      this.logger.log(`[VERIFY] Using Stripe webhook.constructEvent`);
+      const event = this.stripe.webhooks.constructEvent(payloadBuffer, signature, endpointSecret);
+      
+      this.logger.log(`[VERIFY] Webhook signature verification successful`);
+      this.logger.log(`[VERIFY] Event type: ${event.type}, Event ID: ${event.id}`);
       return true;
     } catch (error) {
-      this.logger.error(`Webhook signature verification failed: ${error.message}`);
+      this.logger.error(`[VERIFY] Webhook signature verification failed: ${error.message}`);
+      this.logger.error(`[VERIFY] Error type: ${error.constructor.name}`);
+      
+      // Log thêm thông tin để debug
+      if (error.message.includes('No signatures found')) {
+        this.logger.error(`[VERIFY] No signatures found in header`);
+      } else if (error.message.includes('No signatures found matching')) {
+        this.logger.error(`[VERIFY] Signature format mismatch`);
+      } else if (error.message.includes('Invalid signature')) {
+        this.logger.error(`[VERIFY] Invalid signature - possible secret mismatch`);
+      }
+      
       return false;
     }
   }

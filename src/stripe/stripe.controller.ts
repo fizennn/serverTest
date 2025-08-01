@@ -103,15 +103,33 @@ export class StripeController {
   ) {
     this.logger.log(`[WEBHOOK] Request received - Signature: ${signature ? 'Present' : 'Missing'}`);
     this.logger.log(`[WEBHOOK] Raw body length: ${request.rawBody?.length || 0} bytes`);
+    this.logger.log(`[WEBHOOK] Content-Type: ${request.headers['content-type']}`);
     
     try {
-      const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_...';
+      const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      
+      if (!endpointSecret) {
+        this.logger.error(`[WEBHOOK] STRIPE_WEBHOOK_SECRET is not configured`);
+        response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ 
+          error: 'Webhook secret not configured' 
+        });
+        return;
+      }
+      
       this.logger.log(`[WEBHOOK] Using endpoint secret: ${endpointSecret.substring(0, 10)}...`);
       
       if (!signature) {
         this.logger.error(`[WEBHOOK] Missing stripe-signature header`);
         response.status(HttpStatus.BAD_REQUEST).json({ 
           error: 'Missing stripe-signature header' 
+        });
+        return;
+      }
+
+      if (!request.rawBody) {
+        this.logger.error(`[WEBHOOK] No raw body found`);
+        response.status(HttpStatus.BAD_REQUEST).json({ 
+          error: 'No raw body found' 
         });
         return;
       }
@@ -126,6 +144,8 @@ export class StripeController {
 
       if (!isValid) {
         this.logger.error(`[WEBHOOK] Invalid webhook signature`);
+        this.logger.error(`[WEBHOOK] Signature received: ${signature}`);
+        this.logger.error(`[WEBHOOK] Raw body preview: ${request.rawBody.toString().substring(0, 100)}...`);
         response.status(HttpStatus.BAD_REQUEST).json({ 
           error: 'Invalid webhook signature' 
         });
@@ -150,6 +170,7 @@ export class StripeController {
       
     } catch (error) {
       this.logger.error(`[WEBHOOK] Error: ${error.message}`);
+      this.logger.error(`[WEBHOOK] Error stack: ${error.stack}`);
       response.status(HttpStatus.BAD_REQUEST).json({ 
         error: `Webhook Error: ${error.message}` 
       });
