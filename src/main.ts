@@ -11,20 +11,13 @@ import * as express from 'express';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['error', 'warn', 'debug', 'log', 'verbose'],
+    rawBody: true, // Bật raw body cho toàn bộ app
   });
 
-  app.use(helmet());
-
-  // Cấu hình raw body cho webhook Stripe - PHẢI ĐẶT TRƯỚC TẤT CẢ MIDDLEWARE KHÁC
+  // QUAN TRỌNG: Cấu hình raw body cho webhook TRƯỚC helmet và CORS
   app.use('/stripe/webhook', express.raw({ type: 'application/json' }));
   
-  // Middleware tùy chỉnh để đảm bảo rawBody được set đúng
-  app.use('/stripe/webhook', (req: any, res, next) => {
-    if (req.body && Buffer.isBuffer(req.body)) {
-      req.rawBody = req.body;
-    }
-    next();
-  });
+  app.use(helmet());
 
   // Cho phép tất cả domain truy cập
   app.enableCors({

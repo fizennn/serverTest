@@ -148,8 +148,15 @@ export class StripeController {
         return;
       }
 
-      if (!request.rawBody) {
+      // Kiểm tra rawBody từ NestJS hoặc từ request.body (nếu là Buffer)
+      let rawBody: Buffer;
+      if (request.rawBody) {
+        rawBody = request.rawBody;
+      } else if (request.body && Buffer.isBuffer(request.body)) {
+        rawBody = request.body;
+      } else {
         this.logger.error(`[WEBHOOK] No raw body found`);
+        this.logger.error(`[WEBHOOK] Request body type:`, typeof request.body);
         this.logger.error(`[WEBHOOK] Request body:`, request.body);
         this.logger.error(`[WEBHOOK] Request headers:`, request.headers);
         response.status(HttpStatus.BAD_REQUEST).json({ 
@@ -159,9 +166,9 @@ export class StripeController {
       }
 
       // Verify webhook signature
-      this.logger.log(`[WEBHOOK] Verifying signature`);
+      this.logger.log(`[WEBHOOK] Verifying signature with rawBody length: ${rawBody.length}`);
       const isValid = this.stripeService.verifyWebhookSignature(
-        request.rawBody,
+        rawBody,
         signature,
         endpointSecret,
       );
@@ -169,7 +176,7 @@ export class StripeController {
       if (!isValid) {
         this.logger.error(`[WEBHOOK] Invalid webhook signature`);
         this.logger.error(`[WEBHOOK] Signature received: ${signature}`);
-        this.logger.error(`[WEBHOOK] Raw body preview: ${request.rawBody.toString().substring(0, 200)}...`);
+        this.logger.error(`[WEBHOOK] Raw body preview: ${rawBody.toString().substring(0, 200)}...`);
         response.status(HttpStatus.BAD_REQUEST).json({ 
           error: 'Invalid webhook signature' 
         });
@@ -178,7 +185,7 @@ export class StripeController {
 
       // Parse the event
       this.logger.log(`[WEBHOOK] Parsing event from raw body`);
-      const event = JSON.parse(request.rawBody.toString());
+      const event = JSON.parse(rawBody.toString());
       this.logger.log(`[WEBHOOK] Event parsed - Type: ${event.type}, ID: ${event.id}`);
       
       // TRẢ VỀ 200 NGAY LẬP TỨC SAU KHI VERIFY SIGNATURE
