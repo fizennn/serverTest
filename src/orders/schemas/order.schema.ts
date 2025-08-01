@@ -102,12 +102,10 @@ export class Order {
   @ApiProperty({
     description: 'Phương thức thanh toán',
     example: 'COD',
-    enum: ['COD', 'payOS'],
   })
   @Prop({
     required: true,
     default: 'COD',
-    enum: ['COD', 'payOS'],
   })
   payment!: string;
 

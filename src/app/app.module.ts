@@ -21,6 +21,7 @@ import { AnalyticsModule } from '@/analytics/analytics.module';
 import { ChatbotModule } from '../chatbot/chatbot.module';
 import { PayOSModule } from '../payOS/payOS.module';
 import { ReturnOrdersModule } from '@/return-orders/return-orders.module';
+import { StripeModule } from '../stripe/stripe.module';
 import { PermissionGuard } from '../guards/permission.guard';
 
 @Module({
@@ -49,7 +50,8 @@ import { PermissionGuard } from '../guards/permission.guard';
     ReviewsModule,
     ChatbotModule,
     PayOSModule,
-    ReturnOrdersModule
+    ReturnOrdersModule,
+    StripeModule
   ],
   controllers: [AppController],
   providers: [AppService, PermissionGuard],

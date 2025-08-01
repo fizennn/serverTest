@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -17,6 +18,8 @@ import { VouchersService } from '../../vouchers/services/vouchers.service';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     @InjectModel(Order.name) private orderModel: Model<Order>,
     @InjectModel(User.name) private userModel: Model<User>,
@@ -407,13 +410,26 @@ export class OrdersService {
   }
 
   async updatePaymentStatus(id: string, paymentStatus: 'unpaid' | 'paid' | 'refunded') {
-    const order = await this.orderModel.findById(id);
-    if (!order) {
-      throw new NotFoundException('Không tìm thấy đơn hàng');
+    this.logger.log(`[UPDATE_PAYMENT_STATUS] Request received - OrderId: ${id}, PaymentStatus: ${paymentStatus}`);
+
+    try {
+      const order = await this.orderModel.findById(id);
+      if (!order) {
+        this.logger.error(`[UPDATE_PAYMENT_STATUS] Order not found - OrderId: ${id}`);
+        throw new NotFoundException('Không tìm thấy đơn hàng');
+      }
+
+      this.logger.log(`[UPDATE_PAYMENT_STATUS] Order found - Current payment status: ${order.paymentStatus}`);
+
+      order.paymentStatus = paymentStatus;
+      await order.save();
+
+      this.logger.log(`[UPDATE_PAYMENT_STATUS] Success - OrderId: ${id}, New payment status: ${paymentStatus}`);
+      return { message: 'Cập nhật trạng thái thanh toán thành công', paymentStatus };
+    } catch (error) {
+      this.logger.error(`[UPDATE_PAYMENT_STATUS] Error: ${error.message}`);
+      throw error;
     }
-    order.paymentStatus = paymentStatus;
-    await order.save();
-    return { message: 'Cập nhật trạng thái thanh toán thành công', paymentStatus };
   }
 
   async findUserOrders(

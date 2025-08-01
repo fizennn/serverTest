@@ -33,11 +33,10 @@ export class CreateOrderDto {
   @ApiProperty({
     description: 'Phương thức thanh toán',
     example: 'COD',
-    enum: ['COD', 'payOS'],
     required: false,
   })
   @IsOptional()
-  @IsEnum(['COD', 'payOS'])
+  @IsString()
   payment?: string;
 
   @ApiProperty({
