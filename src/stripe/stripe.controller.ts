@@ -95,6 +95,27 @@ export class StripeController {
     }
   }
 
+  @Get('webhook-test')
+  async testWebhookConfig(@Req() request: RawBodyRequest<Request>) {
+    this.logger.log(`[WEBHOOK_TEST] Testing webhook configuration`);
+    this.logger.log(`[WEBHOOK_TEST] Raw body exists: ${!!request.rawBody}`);
+    this.logger.log(`[WEBHOOK_TEST] Raw body length: ${request.rawBody?.length || 0}`);
+    this.logger.log(`[WEBHOOK_TEST] Content-Type: ${request.headers['content-type']}`);
+    this.logger.log(`[WEBHOOK_TEST] STRIPE_WEBHOOK_SECRET configured: ${!!process.env.STRIPE_WEBHOOK_SECRET}`);
+    
+    return {
+      success: true,
+      message: 'Webhook test endpoint',
+      config: {
+        rawBodyExists: !!request.rawBody,
+        rawBodyLength: request.rawBody?.length || 0,
+        contentType: request.headers['content-type'],
+        webhookSecretConfigured: !!process.env.STRIPE_WEBHOOK_SECRET,
+        webhookSecretLength: process.env.STRIPE_WEBHOOK_SECRET?.length || 0
+      }
+    };
+  }
+
   @Post('webhook')
   async handleWebhook(
     @Req() request: RawBodyRequest<Request>,

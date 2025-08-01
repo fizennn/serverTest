@@ -17,7 +17,7 @@ async function bootstrap() {
 
   // Cấu hình raw body cho webhook Stripe - ĐẶT TRƯỚC CORS
   app.use('/stripe/webhook', express.raw({ 
-    type: 'application/json',
+    type: '*/*', // Thay đổi từ 'application/json' thành '*/*' để nhận tất cả content types
     limit: '10mb' // Tăng limit để đảm bảo nhận được đầy đủ webhook data
   }));
 
