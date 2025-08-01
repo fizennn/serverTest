@@ -23,9 +23,7 @@ export class StripeService {
       const paymentIntent = await this.stripe.paymentIntents.create({
         amount: amount, // Stripe tính bằng đơn vị nhỏ nhất (cent cho USD, đồng cho VND)
         currency: currency,
-        automatic_payment_methods: {
-          enabled: true,
-        },
+        payment_method_types: ['card'], // Chỉ sử dụng card payment method
         metadata: {
           orderId: orderId, // Lưu orderId vào metadata để xử lý webhook
         },
@@ -33,10 +31,13 @@ export class StripeService {
 
       this.logger.log(`Payment intent created successfully - ID: ${paymentIntent.id}, Status: ${paymentIntent.status}`);
       this.logger.log(`Client secret: ${paymentIntent.client_secret?.substring(0, 20)}...`);
+      this.logger.log(`Payment methods available: ${paymentIntent.payment_method_types?.join(', ')}`);
+      this.logger.log(`Metadata: ${JSON.stringify(paymentIntent.metadata)}`);
 
       return {
         clientSecret: paymentIntent.client_secret,
         paymentIntentId: paymentIntent.id,
+        paymentMethods: paymentIntent.payment_method_types,
       };
     } catch (error) {
       this.logger.error(`Error creating payment intent: ${error.message}`);
@@ -77,47 +78,92 @@ export class StripeService {
   }
 
   async handleWebhook(event: any) {
-    this.logger.log(`Handling webhook event - Type: ${event.type}, ID: ${event.id}`);
+    this.logger.log(`[WEBHOOK_SERVICE] Handling webhook event - Type: ${event.type}, ID: ${event.id}`);
     
     try {
       switch (event.type) {
         case 'payment_intent.succeeded':
-          const paymentIntent = event.data.object;
-          this.logger.log(`PaymentIntent was successful! ID: ${paymentIntent.id}, Amount: ${paymentIntent.amount}`);
-          
-          // Lấy orderId từ metadata
-          const orderId = paymentIntent.metadata?.orderId;
-          this.logger.log(`OrderId from metadata: ${orderId || 'Not found'}`);
-          
-          if (orderId) {
-            this.logger.log(`Updating payment status for order: ${orderId} to 'paid'`);
-            // Cập nhật trạng thái thanh toán thành công
-            await this.ordersService.updatePaymentStatus(orderId, 'paid');
-            this.logger.log(`Successfully updated payment status for order: ${orderId}`);
-          } else {
-            this.logger.warn('No orderId found in payment intent metadata');
-          }
+          await this.handlePaymentIntentSucceeded(event.data.object);
           break;
 
         case 'payment_intent.payment_failed':
-          const failedPaymentIntent = event.data.object;
-          this.logger.log(`PaymentIntent failed! ID: ${failedPaymentIntent.id}, Amount: ${failedPaymentIntent.amount}`);
-          
-          const failedOrderId = failedPaymentIntent.metadata?.orderId;
-          this.logger.log(`Failed orderId from metadata: ${failedOrderId || 'Not found'}`);
-          
-          if (failedOrderId) {
-            this.logger.log(`Payment failed for order: ${failedOrderId}`);
-            // Có thể cập nhật trạng thái thanh toán thất bại nếu cần
-          }
+          await this.handlePaymentIntentFailed(event.data.object);
+          break;
+
+        case 'payment_intent.canceled':
+          await this.handlePaymentIntentCanceled(event.data.object);
           break;
 
         default:
-          this.logger.log(`Unhandled event type: ${event.type}`);
+          this.logger.log(`[WEBHOOK_SERVICE] Unhandled event type: ${event.type}`);
       }
     } catch (error) {
-      this.logger.error(`Error handling webhook: ${error.message}`);
-      throw error;
+      this.logger.error(`[WEBHOOK_SERVICE] Error handling webhook: ${error.message}`);
+      this.logger.error(`[WEBHOOK_SERVICE] Error stack: ${error.stack}`);
+      // Không throw error để tránh ảnh hưởng đến response 200
+    }
+  }
+
+  private async handlePaymentIntentSucceeded(paymentIntent: any) {
+    this.logger.log(`[WEBHOOK_SERVICE] PaymentIntent was successful! ID: ${paymentIntent.id}, Amount: ${paymentIntent.amount}`);
+    this.logger.log(`[WEBHOOK_SERVICE] PaymentIntent metadata: ${JSON.stringify(paymentIntent.metadata)}`);
+    
+    // Lấy orderId từ metadata
+    const orderId = paymentIntent.metadata?.orderId;
+    this.logger.log(`[WEBHOOK_SERVICE] OrderId from metadata: ${orderId || 'Not found'}`);
+    
+    if (orderId) {
+      try {
+        this.logger.log(`[WEBHOOK_SERVICE] Updating payment status for order: ${orderId} to 'paid'`);
+        // Cập nhật trạng thái thanh toán thành công
+        await this.ordersService.updatePaymentStatus(orderId, 'paid');
+        this.logger.log(`[WEBHOOK_SERVICE] Successfully updated payment status for order: ${orderId}`);
+      } catch (error) {
+        this.logger.error(`[WEBHOOK_SERVICE] Error updating payment status for order ${orderId}: ${error.message}`);
+      }
+    } else {
+      this.logger.warn('[WEBHOOK_SERVICE] No orderId found in payment intent metadata');
+      this.logger.warn('[WEBHOOK_SERVICE] This payment intent was created without orderId in metadata');
+      this.logger.warn('[WEBHOOK_SERVICE] Please ensure orderId is passed when creating payment intent');
+      
+      // Có thể thêm logic khác ở đây, ví dụ:
+      // - Lưu payment intent vào database để tracking
+      // - Gửi notification cho admin
+      // - Log để manual review
+    }
+  }
+
+  private async handlePaymentIntentFailed(paymentIntent: any) {
+    this.logger.log(`[WEBHOOK_SERVICE] PaymentIntent failed! ID: ${paymentIntent.id}, Amount: ${paymentIntent.amount}`);
+    
+    const orderId = paymentIntent.metadata?.orderId;
+    this.logger.log(`[WEBHOOK_SERVICE] Failed orderId from metadata: ${orderId || 'Not found'}`);
+    
+    if (orderId) {
+      try {
+        this.logger.log(`[WEBHOOK_SERVICE] Payment failed for order: ${orderId}`);
+        // Không cập nhật payment status vì method chỉ chấp nhận 'unpaid', 'paid', 'refunded'
+        // Có thể thêm logic khác ở đây như gửi notification, log, etc.
+      } catch (error) {
+        this.logger.error(`[WEBHOOK_SERVICE] Error handling failed payment for order ${orderId}: ${error.message}`);
+      }
+    }
+  }
+
+  private async handlePaymentIntentCanceled(paymentIntent: any) {
+    this.logger.log(`[WEBHOOK_SERVICE] PaymentIntent canceled! ID: ${paymentIntent.id}, Amount: ${paymentIntent.amount}`);
+    
+    const orderId = paymentIntent.metadata?.orderId;
+    this.logger.log(`[WEBHOOK_SERVICE] Canceled orderId from metadata: ${orderId || 'Not found'}`);
+    
+    if (orderId) {
+      try {
+        this.logger.log(`[WEBHOOK_SERVICE] Payment canceled for order: ${orderId}`);
+        // Không cập nhật payment status vì method chỉ chấp nhận 'unpaid', 'paid', 'refunded'
+        // Có thể thêm logic khác ở đây như gửi notification, log, etc.
+      } catch (error) {
+        this.logger.error(`[WEBHOOK_SERVICE] Error handling canceled payment for order ${orderId}: ${error.message}`);
+      }
     }
   }
 

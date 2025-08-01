@@ -1,4 +1,5 @@
-import { Controller, Post, Get, Body, Param, HttpException, HttpStatus, Headers, RawBodyRequest, Req, Logger } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, HttpException, HttpStatus, Headers, RawBodyRequest, Req, Logger, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { StripeService } from './stripe.service';
 import { CreatePaymentIntentDto, ConfirmPaymentDto } from './dto/payment.dto';
 
@@ -10,20 +11,26 @@ export class StripeController {
 
   @Post('create-payment-intent')
   async createPaymentIntent(@Body() body: CreatePaymentIntentDto) {
-    this.logger.log(`[CREATE_PAYMENT_INTENT] Request received - Amount: ${body.amount}, Currency: ${body.currency}, OrderId: ${body.orderId || 'N/A'}`);
+    this.logger.log(`[CREATE_PAYMENT_INTENT] Request received - Amount: ${body.amount}, Currency: ${body.currency}, OrderId: ${body.orderId || 'N/A'}, PaymentMethods: ${body.paymentMethods?.join(', ') || 'card'}`);
     
     try {
-      const { amount, currency = 'vnd', orderId } = body;
+      const { amount, currency = 'vnd', orderId, paymentMethods = ['card'] } = body;
       
       if (!amount || amount <= 0) {
         this.logger.error(`[CREATE_PAYMENT_INTENT] Invalid amount: ${amount}`);
         throw new HttpException('Số tiền phải lớn hơn 0', HttpStatus.BAD_REQUEST);
       }
 
+      // Kiểm tra orderId nếu cần
+      if (!orderId) {
+        this.logger.warn('[CREATE_PAYMENT_INTENT] No orderId provided - this may cause issues with webhook processing');
+        this.logger.warn('[CREATE_PAYMENT_INTENT] Please ensure orderId is passed for proper order tracking');
+      }
+
       this.logger.log(`[CREATE_PAYMENT_INTENT] Calling StripeService.createPaymentIntent`);
       const result = await this.stripeService.createPaymentIntent(amount, currency, orderId);
       
-      this.logger.log(`[CREATE_PAYMENT_INTENT] Success - PaymentIntentId: ${result.paymentIntentId}`);
+      this.logger.log(`[CREATE_PAYMENT_INTENT] Success - PaymentIntentId: ${result.paymentIntentId}, PaymentMethods: ${result.paymentMethods?.join(', ')}`);
       return {
         success: true,
         data: result,
@@ -92,17 +99,21 @@ export class StripeController {
   async handleWebhook(
     @Req() request: RawBodyRequest<Request>,
     @Headers('stripe-signature') signature: string,
+    @Res() response: Response,
   ) {
     this.logger.log(`[WEBHOOK] Request received - Signature: ${signature ? 'Present' : 'Missing'}`);
     this.logger.log(`[WEBHOOK] Raw body length: ${request.rawBody?.length || 0} bytes`);
     
     try {
-      const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_...'; // Webhook secret từ Stripe Dashboard
+      const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_...';
       this.logger.log(`[WEBHOOK] Using endpoint secret: ${endpointSecret.substring(0, 10)}...`);
       
       if (!signature) {
         this.logger.error(`[WEBHOOK] Missing stripe-signature header`);
-        throw new HttpException('Missing stripe-signature header', HttpStatus.BAD_REQUEST);
+        response.status(HttpStatus.BAD_REQUEST).json({ 
+          error: 'Missing stripe-signature header' 
+        });
+        return;
       }
 
       // Verify webhook signature
@@ -115,7 +126,10 @@ export class StripeController {
 
       if (!isValid) {
         this.logger.error(`[WEBHOOK] Invalid webhook signature`);
-        throw new HttpException('Invalid webhook signature', HttpStatus.BAD_REQUEST);
+        response.status(HttpStatus.BAD_REQUEST).json({ 
+          error: 'Invalid webhook signature' 
+        });
+        return;
       }
 
       // Parse the event
@@ -123,18 +137,22 @@ export class StripeController {
       const event = JSON.parse(request.rawBody.toString());
       this.logger.log(`[WEBHOOK] Event parsed - Type: ${event.type}, ID: ${event.id}`);
       
-      // Handle the webhook event
-      this.logger.log(`[WEBHOOK] Calling StripeService.handleWebhook`);
-      await this.stripeService.handleWebhook(event);
-
-      this.logger.log(`[WEBHOOK] Success - Event processed`);
-      return { received: true };
+      // TRẢ VỀ 200 NGAY LẬP TỨC SAU KHI VERIFY SIGNATURE
+      this.logger.log(`[WEBHOOK] Sending 200 OK response immediately`);
+      response.status(HttpStatus.OK).json({ received: true });
+      
+      // XỬ LÝ LOGIC SAU KHI ĐÃ TRẢ VỀ 200
+      this.logger.log(`[WEBHOOK] Processing webhook event asynchronously`);
+      this.stripeService.handleWebhook(event).catch(error => {
+        this.logger.error(`[WEBHOOK] Error processing webhook event: ${error.message}`);
+        // Không throw error vì đã trả về 200
+      });
+      
     } catch (error) {
       this.logger.error(`[WEBHOOK] Error: ${error.message}`);
-      throw new HttpException(
-        `Webhook Error: ${error.message}`,
-        HttpStatus.BAD_REQUEST,
-      );
+      response.status(HttpStatus.BAD_REQUEST).json({ 
+        error: `Webhook Error: ${error.message}` 
+      });
     }
   }
 } 

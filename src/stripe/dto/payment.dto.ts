@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsString, IsOptional, Min } from 'class-validator';
+import { IsNumber, IsString, IsOptional, Min, IsArray } from 'class-validator';
 
 export class CreatePaymentIntentDto {
   @ApiProperty({
@@ -27,6 +27,16 @@ export class CreatePaymentIntentDto {
   @IsString()
   @IsOptional()
   orderId?: string;
+
+  @ApiProperty({
+    description: 'Các phương thức thanh toán được hỗ trợ',
+    example: ['card'],
+    default: ['card'],
+    required: false,
+  })
+  @IsArray()
+  @IsOptional()
+  paymentMethods?: string[];
 }
 
 export class ConfirmPaymentDto {

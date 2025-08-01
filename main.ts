@@ -6,6 +6,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { join } from 'path';
+import * as express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -13,6 +14,11 @@ async function bootstrap() {
   });
 
   app.use(helmet());
+
+    app.use('/stripe/webhook', express.raw({ 
+    type: 'application/json',
+    limit: '10mb' // Tăng limit để đảm bảo nhận được đầy đủ webhook data
+  }));
 
   // Cho phép tất cả domain truy cập
   app.enableCors({
