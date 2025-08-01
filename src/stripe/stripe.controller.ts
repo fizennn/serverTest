@@ -125,6 +125,7 @@ export class StripeController {
     this.logger.log(`[WEBHOOK] Request received - Signature: ${signature ? 'Present' : 'Missing'}`);
     this.logger.log(`[WEBHOOK] Raw body length: ${request.rawBody?.length || 0} bytes`);
     this.logger.log(`[WEBHOOK] Content-Type: ${request.headers['content-type']}`);
+    this.logger.log(`[WEBHOOK] User-Agent: ${request.headers['user-agent']}`);
     
     try {
       const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -149,6 +150,8 @@ export class StripeController {
 
       if (!request.rawBody) {
         this.logger.error(`[WEBHOOK] No raw body found`);
+        this.logger.error(`[WEBHOOK] Request body:`, request.body);
+        this.logger.error(`[WEBHOOK] Request headers:`, request.headers);
         response.status(HttpStatus.BAD_REQUEST).json({ 
           error: 'No raw body found' 
         });
@@ -166,7 +169,7 @@ export class StripeController {
       if (!isValid) {
         this.logger.error(`[WEBHOOK] Invalid webhook signature`);
         this.logger.error(`[WEBHOOK] Signature received: ${signature}`);
-        this.logger.error(`[WEBHOOK] Raw body preview: ${request.rawBody.toString().substring(0, 100)}...`);
+        this.logger.error(`[WEBHOOK] Raw body preview: ${request.rawBody.toString().substring(0, 200)}...`);
         response.status(HttpStatus.BAD_REQUEST).json({ 
           error: 'Invalid webhook signature' 
         });

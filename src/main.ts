@@ -16,10 +16,19 @@ async function bootstrap() {
   app.use(helmet());
 
   // Cấu hình raw body cho webhook Stripe - ĐẶT TRƯỚC CORS
-  app.use('/stripe/webhook', express.raw({ 
-    type: '*/*', // Thay đổi từ 'application/json' thành '*/*' để nhận tất cả content types
-    limit: '10mb' // Tăng limit để đảm bảo nhận được đầy đủ webhook data
-  }));
+  app.use('/stripe/webhook', (req, res, next) => {
+    let data = '';
+    req.setEncoding('utf8');
+    
+    req.on('data', (chunk) => {
+      data += chunk;
+    });
+    
+    req.on('end', () => {
+      req.rawBody = Buffer.from(data, 'utf8');
+      next();
+    });
+  });
 
   // Cho phép tất cả domain truy cập
   app.enableCors({
