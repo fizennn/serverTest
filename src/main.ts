@@ -15,19 +15,15 @@ async function bootstrap() {
 
   app.use(helmet());
 
-  // Cấu hình raw body cho webhook Stripe - ĐẶT TRƯỚC CORS
-  app.use('/stripe/webhook', (req, res, next) => {
-    let data = '';
-    req.setEncoding('utf8');
-    
-    req.on('data', (chunk) => {
-      data += chunk;
-    });
-    
-    req.on('end', () => {
-      req.rawBody = Buffer.from(data, 'utf8');
-      next();
-    });
+  // Cấu hình raw body cho webhook Stripe - PHẢI ĐẶT TRƯỚC TẤT CẢ MIDDLEWARE KHÁC
+  app.use('/stripe/webhook', express.raw({ type: 'application/json' }));
+  
+  // Middleware tùy chỉnh để đảm bảo rawBody được set đúng
+  app.use('/stripe/webhook', (req: any, res, next) => {
+    if (req.body && Buffer.isBuffer(req.body)) {
+      req.rawBody = req.body;
+    }
+    next();
   });
 
   // Cho phép tất cả domain truy cập

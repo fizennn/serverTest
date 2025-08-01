@@ -23,18 +23,15 @@ PORT=3001
 Đã sửa middleware để xử lý raw body đúng cách:
 
 ```typescript
-app.use('/stripe/webhook', (req, res, next) => {
-  let data = '';
-  req.setEncoding('utf8');
-  
-  req.on('data', (chunk) => {
-    data += chunk;
-  });
-  
-  req.on('end', () => {
-    req.rawBody = Buffer.from(data, 'utf8');
-    next();
-  });
+// Cấu hình raw body cho webhook Stripe - PHẢI ĐẶT TRƯỚC TẤT CẢ MIDDLEWARE KHÁC
+app.use('/stripe/webhook', express.raw({ type: 'application/json' }));
+
+// Middleware tùy chỉnh để đảm bảo rawBody được set đúng
+app.use('/stripe/webhook', (req: any, res, next) => {
+  if (req.body && Buffer.isBuffer(req.body)) {
+    req.rawBody = req.body;
+  }
+  next();
 });
 ```
 
@@ -43,7 +40,10 @@ app.use('/stripe/webhook', (req, res, next) => {
 # Kiểm tra cấu hình
 GET http://localhost:3001/stripe/webhook-test
 
-# Test với dữ liệu thật
+# Test với script mới (được tạo sẵn)
+node test-webhook-fix.js
+
+# Hoặc test với script cũ
 node test-real-webhook.js
 ```
 
