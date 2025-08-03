@@ -13,6 +13,8 @@ export interface OrderWithTimestamps extends Order {
 
 @Schema({ _id: true })
 export class OrderItem {
+  _id?: mongoose.Types.ObjectId;
+
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
     required: true,
@@ -28,6 +30,18 @@ export class OrderItem {
 
   @Prop({ required: true })
   variant!: string;
+
+  @ApiProperty({
+    description: 'Trạng thái của item trong đơn hàng',
+    example: 'pending',
+    // Loại bỏ enum để cho phép bất kỳ status nào
+  })
+  @Prop({ 
+    required: true, 
+    default: 'pending'
+    // Loại bỏ enum validation
+  })
+  status!: string;
 }
 
 @Schema({ _id: false })
@@ -197,12 +211,12 @@ export class Order {
   @ApiProperty({
     description: 'Trạng thái đơn hàng',
     example: 'pending',
-    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'],
+    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'return-pending', 'return-approved', 'return-rejected', 'return-processing', 'return-completed'],
   })
   @Prop({
     required: true,
     default: 'pending',
-    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'],
+    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'return-pending', 'return-approved', 'return-rejected', 'return-processing', 'return-completed'],
   })
   status!: string;
 

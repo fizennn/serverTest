@@ -79,3 +79,37 @@ export class PaginatedOrderResponseDto {
   @ApiProperty({ example: 5, description: 'Tổng số trang' })
   pages: number;
 } 
+
+export class UpdateItemStatusDto {
+  @ApiProperty({
+    description: 'Trạng thái của item trong đơn hàng',
+    example: 'processing',
+    enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'],
+  })
+  @IsEnum(['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'])
+  status!: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned';
+}
+
+// DTO đơn giản để test
+export class SimpleUpdateItemStatusDto {
+  @ApiProperty({
+    description: 'Trạng thái của item trong đơn hàng',
+    example: 'processing',
+    enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'],
+  })
+  @IsEnum(['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'])
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned';
+}
+
+// DTO mới với validation đầy đủ
+export class UpdateItemStatusRequestDto {
+  @ApiProperty({
+    description: 'Trạng thái của item trong đơn hàng',
+    example: 'processing',
+    // Loại bỏ enum để cho phép truyền bất kỳ status nào
+  })
+  @IsString({
+    message: 'Status phải là một chuỗi'
+  })
+  status!: string;
+} 

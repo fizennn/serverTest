@@ -17,6 +17,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { ChatbotService } from '../services/chatbot.service';
 import { InventoryCheckerService } from '../services/inventory-checker.service';
@@ -52,7 +53,7 @@ export class ChatbotController {
   async createConversation(
     @Request() req: any,
     @Body() createConversationDto: CreateConversationDto,
-  ): Promise<ChatHistoryDto> {
+  ): Promise<ChatHistoryDto & { type?: string; dataId?: string; productData?: any }> {
     return this.chatbotService.createConversation(
       req.user.id,
       createConversationDto,
@@ -82,14 +83,53 @@ export class ChatbotController {
   }
 
   @Get('conversations')
-  @ApiOperation({ summary: 'Lấy lịch sử chat của user' })
+  @ApiOperation({ 
+    summary: 'Lấy lịch sử chat của user',
+    description: 'Mặc định trả về câu trả lời cuối cùng của mỗi cuộc hội thoại. Thêm ?type=full để lấy toàn bộ lịch sử chat.'
+  })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    description: 'Loại dữ liệu trả về: "full" để lấy toàn bộ lịch sử, mặc định lấy câu trả lời cuối cùng',
+    example: 'full',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Lấy lịch sử chat thành công',
-    type: [ChatHistoryDto],
+    type: [ChatResponseDto],
   })
-  async getChatHistory(@Request() req: any): Promise<ChatHistoryDto[]> {
-    return this.chatbotService.getChatHistory(req.user.id);
+  async getChatHistory(
+    @Request() req: any,
+    @Query('type') type?: string,
+  ): Promise<ChatResponseDto[] | ChatHistoryDto[]> {
+    const conversations = await this.chatbotService.getChatHistory(req.user.id);
+    
+    // Nếu type = 'full', trả về toàn bộ lịch sử
+    if (type === 'full') {
+      return conversations;
+    }
+    
+    // Mặc định trả về ChatResponseDto[] (chỉ câu trả lời cuối cùng)
+    const responses: ChatResponseDto[] = [];
+    
+    for (const conversation of conversations) {
+      if (conversation.messages && conversation.messages.length > 0) {
+        // Lấy tin nhắn cuối cùng (câu trả lời từ model)
+        const lastMessage = conversation.messages[conversation.messages.length - 1];
+        if (lastMessage.role === 'model') {
+          responses.push({
+            conversationId: conversation._id,
+            response: lastMessage.content,
+            timestamp: lastMessage.timestamp,
+            type: lastMessage.type || null,
+            dataId: lastMessage.dataId || null,
+            productData: lastMessage.productData || null,
+          });
+        }
+      }
+    }
+    
+    return responses;
   }
 
   @Get('conversations/:id')
@@ -98,7 +138,7 @@ export class ChatbotController {
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Lấy chi tiết cuộc hội thoại thành công',
-    type: ChatHistoryDto,
+    type: ChatResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -107,8 +147,73 @@ export class ChatbotController {
   async getConversation(
     @Request() req: any,
     @Param('id') conversationId: string,
-  ): Promise<ChatHistoryDto> {
-    return this.chatbotService.getConversation(req.user.id, conversationId);
+  ): Promise<ChatResponseDto> {
+    const conversation = await this.chatbotService.getConversation(req.user.id, conversationId);
+    
+    // Chuyển đổi từ ChatHistoryDto sang ChatResponseDto
+    if (conversation.messages && conversation.messages.length > 0) {
+      // Lấy tin nhắn cuối cùng (câu trả lời từ model)
+      const lastMessage = conversation.messages[conversation.messages.length - 1];
+      if (lastMessage.role === 'model') {
+        return {
+          conversationId: conversation._id,
+          response: lastMessage.content,
+          timestamp: lastMessage.timestamp,
+          type: lastMessage.type || null,
+          dataId: lastMessage.dataId || null,
+          productData: lastMessage.productData || null,
+        };
+      }
+    }
+    
+    // Fallback nếu không có tin nhắn model
+    return {
+      conversationId: conversation._id,
+      response: 'Không có câu trả lời',
+      timestamp: new Date(),
+      type: null,
+      dataId: null,
+      productData: null,
+    };
+  }
+
+  @Get('conversations/:id/full')
+  @ApiOperation({ summary: 'Lấy toàn bộ lịch sử chat của một cuộc hội thoại' })
+  @ApiParam({ name: 'id', description: 'ID cuộc hội thoại' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Lấy toàn bộ lịch sử chat thành công',
+    type: ChatHistoryDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Không tìm thấy cuộc hội thoại',
+  })
+  async getFullConversation(
+    @Request() req: any,
+    @Param('id') conversationId: string,
+  ): Promise<ChatHistoryDto & { type?: string; dataId?: string; productData?: any }> {
+    const conversation = await this.chatbotService.getConversation(req.user.id, conversationId);
+    
+    // Lấy tin nhắn cuối cùng để kiểm tra type và dataId
+    if (conversation.messages && conversation.messages.length > 0) {
+      const lastMessage = conversation.messages[conversation.messages.length - 1];
+      if (lastMessage.role === 'model') {
+        return {
+          ...conversation,
+          type: lastMessage.type || null,
+          dataId: lastMessage.dataId || null,
+          productData: lastMessage.productData || null,
+        };
+      }
+    }
+    
+    return {
+      ...conversation,
+      type: null,
+      dataId: null,
+      productData: null,
+    };
   }
 
   @Put('conversations/:id/end')
@@ -168,5 +273,15 @@ export class ChatbotController {
       size,
     });
     return result;
+  }
+
+  @Get('analytics/inventory-checks')
+  @ApiOperation({ summary: 'Lấy thống kê về inventory checks' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Lấy thống kê thành công',
+  })
+  async getInventoryCheckAnalytics(@Request() req: any) {
+    return this.chatbotService.getInventoryCheckAnalytics(req.user.id);
   }
 } 

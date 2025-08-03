@@ -7,6 +7,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { join } from 'path';
 import * as express from 'express';
+import axios from 'axios';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -44,7 +45,7 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false, // Tạm thời tắt để test
       transformOptions: {
         enableImplicitConversion: true,
       },
@@ -104,6 +105,10 @@ async function bootstrap() {
   });
 
   app.enableShutdownHooks();
+  //them code 15phut tu ping server 1 lan
+  setInterval(() => {
+    axios.get('https://fizennn.click/v1/products');
+  }, 15 * 60 * 1000); // 15 phút
 
   const port = process.env.PORT || 3001;
   await app.listen(port);

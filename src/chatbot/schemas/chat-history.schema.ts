@@ -17,6 +17,34 @@ export class ChatMessage {
 
   @Prop({ required: true, default: Date.now })
   timestamp!: Date;
+
+  @ApiProperty({
+    description: 'Loại tin nhắn (inventory_check, general, etc.)',
+    example: 'inventory_check',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @Prop({ required: false })
+  type?: string;
+
+  @ApiProperty({
+    description: 'ID dữ liệu được tìm thấy',
+    example: '507f1f77bcf86cd799439011',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @Prop({ required: false })
+  dataId?: string;
+
+  @ApiProperty({
+    description: 'Dữ liệu sản phẩm (khi type là inventory_check)',
+    required: false,
+  })
+  @IsOptional()
+  @Prop({ required: false, type: mongoose.Schema.Types.Mixed })
+  productData?: any;
 }
 
 @Schema({ timestamps: true })

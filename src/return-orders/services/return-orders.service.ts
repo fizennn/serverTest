@@ -45,9 +45,9 @@ export class ReturnOrdersService {
       throw new ForbiddenException('Không có quyền trả hàng đơn hàng này');
     }
 
-    if (order.status !== 'delivered') {
+    if (order.status !== 'delivered' && !order.status.startsWith('return-')) {
       throw new BadRequestException(
-        'Chỉ có thể trả hàng với đơn hàng đã giao thành công',
+        'Chỉ có thể trả hàng với đơn hàng đã giao thành công hoặc đang trong quá trình trả hàng',
       );
     }
 
@@ -69,13 +69,36 @@ export class ReturnOrdersService {
     let totalRefundAmount = 0;
 
     for (const returnItem of returnOrderDto.items) {
-      const orderItem = order.items.find(
-        item => item.product._id.toString() === returnItem.productId,
+      console.log('=== DEBUG ITEM ID COMPARISON ===');
+      console.log('ReturnItem itemId:', returnItem.itemId);
+      console.log('ReturnItem productId:', returnItem.productId);
+      
+      console.log('Order items:');
+      order.items.forEach((item, index) => {
+        console.log(`Item ${index}:`, {
+          itemId: item._id?.toString(),
+          productId: item.product._id.toString(),
+          status: item.status
+        });
+      });
+      
+      // Tìm item theo itemId thay vì productId
+      const orderItemIndex = order.items.findIndex(
+        item => item._id?.toString() === returnItem.itemId,
       );
 
-      if (!orderItem) {
+      if (orderItemIndex === -1) {
         throw new BadRequestException(
-          `Sản phẩm ${returnItem.productId} không có trong đơn hàng`,
+          `Item ${returnItem.itemId} không có trong đơn hàng`,
+        );
+      }
+
+      const orderItem = order.items[orderItemIndex];
+
+      // Kiểm tra xem productId có khớp không
+      if (orderItem.product._id.toString() !== returnItem.productId) {
+        throw new BadRequestException(
+          `ProductId ${returnItem.productId} không khớp với item ${returnItem.itemId}`,
         );
       }
 
@@ -92,11 +115,18 @@ export class ReturnOrdersService {
 
       returnItems.push({
         productId: new Types.ObjectId(returnItem.productId),
+        itemId: new Types.ObjectId(returnItem.itemId),
         quantity: returnItem.quantity,
         unitPrice: orderItem.price,
         totalPrice: totalPrice,
         variant: orderItem.variant || '',
       });
+
+      // Cập nhật status của item trong order thành 'return-pending'
+      console.log(`Updating item ${returnItem.itemId} status to return-pending`);
+      console.log('Original item status:', order.items[orderItemIndex].status);
+      order.items[orderItemIndex].status = 'return-pending';
+      console.log('Updated item status:', order.items[orderItemIndex].status);
     }
 
     const returnOrder = await this.returnOrderModel.create({
@@ -109,6 +139,18 @@ export class ReturnOrdersService {
       status: 'pending',
       images: returnOrderDto.images || [],
     });
+
+    // Cập nhật trạng thái đơn hàng gốc thành return-pending và lưu thay đổi
+    console.log('Updating order status to return-pending');
+    order.status = 'return-pending';
+    
+    console.log('Before save - items status:', order.items.map(item => item.status));
+    
+    // Sử dụng save() method để đảm bảo thay đổi được lưu đúng cách
+    await (order as any).save();
+    
+    console.log('Order saved successfully');
+    console.log('After save - items status:', order.items.map(item => item.status));
 
     const populatedReturn = await this.returnOrderModel
       .findById(returnOrder._id)
@@ -276,14 +318,70 @@ export class ReturnOrdersService {
     returnRequest.adminNote = updateData.adminNote;
     returnRequest.processedAt = new Date();
 
+    // Lấy thông tin đơn hàng gốc để cập nhật items
+    const order = await this.orderModel.findById(returnRequest.orderId).populate('items.product');
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng gốc');
+    }
+
+    // Cập nhật status của items trong order dựa trên trạng thái return
+    const returnItemIds = returnRequest.items.map(item => item.itemId.toString());
+
+    console.log('Return item IDs:', returnItemIds);
+    console.log('Order items:', order.items.map(item => ({
+      itemId: item._id?.toString() || 'unknown',
+      productId: item.product?._id?.toString() || item.product?.toString() || 'unknown',
+      status: item.status
+    })));
+
+    for (let i = 0; i < order.items.length; i++) {
+      const item = order.items[i];
+      const itemId = item._id?.toString();
+      
+      if (returnItemIds.includes(itemId)) {
+        console.log(`Updating item ${itemId} status to ${updateData.status}`);
+        
+        // Cập nhật status của item dựa trên trạng thái return
+        if (updateData.status === 'approved') {
+          order.items[i].status = 'return-approved';
+        } else if (updateData.status === 'processing') {
+          order.items[i].status = 'return-processing';
+        } else if (updateData.status === 'completed') {
+          order.items[i].status = 'return-completed';
+        } else if (updateData.status === 'rejected') {
+          order.items[i].status = 'return-rejected';
+        }
+      }
+    }
+
     if (updateData.status === 'approved') {
       console.log(
         `Đã chấp nhận trả hàng với số tiền: ${returnRequest.totalRefundAmount}`,
       );
+      // Cập nhật trạng thái đơn hàng gốc thành return-approved
+      console.log('Updating order status to return-approved');
+      order.status = 'return-approved';
+      
+      // Lưu thay đổi order
+      await (order as any).save();
+      
+      console.log('Order saved successfully');
+      console.log('Đã chấp nhận trả hàng và cập nhật trạng thái đơn hàng');
+    } else if (updateData.status === 'processing') {
+      // Cập nhật trạng thái đơn hàng gốc thành return-processing
+      order.status = 'return-processing';
+      await (order as any).save();
+      console.log('Đang xử lý trả hàng');
     } else if (updateData.status === 'completed') {
       await this.restoreProductStock(returnRequest);
+      // Cập nhật trạng thái đơn hàng gốc thành return-completed
+      order.status = 'return-completed';
+      await (order as any).save();
       console.log('Đã hoàn thành trả hàng và cập nhật tồn kho');
     } else if (updateData.status === 'rejected') {
+      // Cập nhật trạng thái đơn hàng gốc thành return-rejected
+      order.status = 'return-rejected';
+      await (order as any).save();
       console.log('Đã từ chối yêu cầu trả hàng');
     }
 
@@ -315,6 +413,25 @@ export class ReturnOrdersService {
       );
     }
 
+    // Khôi phục status của items trong order về trạng thái ban đầu
+    const order = await this.orderModel.findById(returnRequest.orderId).populate('items.product');
+    if (order) {
+      const returnItemIds = returnRequest.items.map(item => item.itemId.toString());
+
+      for (let i = 0; i < order.items.length; i++) {
+        const item = order.items[i];
+        const itemId = item._id?.toString();
+        if (returnItemIds.includes(itemId)) {
+          // Khôi phục về trạng thái 'delivered' nếu đơn hàng đã giao thành công
+          order.items[i].status = 'delivered';
+        }
+      }
+
+      // Cập nhật order với items đã khôi phục và trạng thái về 'delivered'
+      order.status = 'delivered';
+      await (order as any).save();
+    }
+
     await this.returnOrderModel.findByIdAndDelete(returnId);
   }
 
@@ -341,6 +458,7 @@ export class ReturnOrdersService {
         }
 
         await product.save();
+        console.log(`Restored ${item.quantity} items for product ${item.productId} (itemId: ${item.itemId})`);
       }
     }
   }

@@ -114,6 +114,13 @@ GET /chatbot/check-inventory?productName=áo sơ mi&color=trắng&size=L
 Authorization: Bearer <jwt_token>
 ```
 
+### 8. Lấy thống kê inventory checks
+
+```http
+GET /chatbot/analytics/inventory-checks
+Authorization: Bearer <jwt_token>
+```
+
 ## Tính năng
 
 ### 1. Tích hợp Gemini API
@@ -133,12 +140,17 @@ Authorization: Bearer <jwt_token>
 - Kết thúc cuộc hội thoại
 - Xóa cuộc hội thoại
 
-### 4. Bảo mật
+### 4. Lưu trữ thông tin chi tiết
+- **Type**: Lưu loại tin nhắn (`inventory_check`, `general`)
+- **DataId**: Lưu ID dữ liệu được tìm thấy
+- **Analytics**: Thống kê về các sản phẩm được kiểm tra
+
+### 5. Bảo mật
 - Yêu cầu JWT authentication
 - Mỗi user chỉ có thể truy cập cuộc hội thoại của mình
 - Validation dữ liệu đầu vào
 
-### 4. Database Schema
+### 6. Database Schema
 
 #### ChatHistory
 - `user`: Reference đến User
@@ -152,6 +164,8 @@ Authorization: Bearer <jwt_token>
 - `role`: 'user' hoặc 'model'
 - `content`: Nội dung tin nhắn
 - `timestamp`: Thời gian gửi
+- `type`: Loại tin nhắn (inventory_check, general, etc.)
+- `dataId`: ID dữ liệu được tìm thấy
 
 ## Sử dụng trong frontend
 
@@ -200,6 +214,17 @@ const checkInventory = async (productName: string, color?: string, size?: string
   
   return response.json();
 };
+
+// Lấy thống kê inventory checks
+const getInventoryAnalytics = async () => {
+  const response = await fetch('/api/chatbot/analytics/inventory-checks', {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+  
+  return response.json();
+};
 ```
 
 ### Ví dụ câu hỏi chatbot có thể hiểu:
@@ -211,6 +236,39 @@ const checkInventory = async (productName: string, color?: string, size?: string
 "Còn bao nhiêu áo khoác đen size XL?"
 ```
 
+### Ví dụ response với thông tin được lưu:
+
+```json
+{
+  "conversationId": "507f1f77bcf86cd799439011",
+  "response": "✅ Áo sơ mi trắng size L còn 5 cái trong kho. Giá: 250,000 VNĐ.",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "type": "inventory_check",
+  "dataId": "507f1f77bcf86cd799439012"
+}
+```
+
+### Ví dụ analytics response:
+
+```json
+{
+  "totalInventoryChecks": 25,
+  "uniqueProductsChecked": 8,
+  "productStats": [
+    {
+      "productId": "507f1f77bcf86cd799439012",
+      "count": 5,
+      "lastChecked": "2024-01-15T10:30:00.000Z",
+      "found": true,
+      "productName": "Áo sơ mi trắng",
+      "brand": "Brand Name",
+      "averagePrice": 250000
+    }
+  ],
+  "recentChecks": [...]
+}
+```
+
 ## Lưu ý
 
 1. **API Key**: Đảm bảo có API key hợp lệ từ Google AI Studio
@@ -218,6 +276,7 @@ const checkInventory = async (productName: string, color?: string, size?: string
 3. **Error Handling**: Luôn xử lý lỗi khi gọi API bên ngoài
 4. **Security**: Không expose API key trong frontend
 5. **Performance**: Cân nhắc caching cho các câu trả lời phổ biến
+6. **Data Storage**: Thông tin type và dataId được lưu tự động vào database
 
 ## Troubleshooting
 

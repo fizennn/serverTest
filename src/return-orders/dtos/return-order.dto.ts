@@ -7,6 +7,10 @@ export class ReturnItemDto {
   @IsString()
   productId: string;
 
+  @ApiProperty({ description: 'ID của item trong order', example: '507f1f77bcf86cd799439014' })
+  @IsString()
+  itemId: string;
+
   @ApiProperty({ description: 'Số lượng trả', example: 1 })
   @Transform(({ value }) => parseInt(value))
   @Type(() => Number)

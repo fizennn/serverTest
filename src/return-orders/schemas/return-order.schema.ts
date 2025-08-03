@@ -17,6 +17,7 @@ export class ReturnOrder {
 
   @Prop([{
     productId: { type: Types.ObjectId, ref: 'Product', required: true },
+    itemId: { type: Types.ObjectId, required: true },
     quantity: { type: Number, required: true },
     unitPrice: { type: Number, required: true },
     totalPrice: { type: Number, required: true },
@@ -24,6 +25,7 @@ export class ReturnOrder {
   }])
   items: Array<{
     productId: Types.ObjectId;
+    itemId: Types.ObjectId;
     quantity: number;
     unitPrice: number;
     totalPrice: number;
@@ -34,7 +36,7 @@ export class ReturnOrder {
   totalRefundAmount: number;
 
   @Prop({ 
-    enum: ['pending', 'approved', 'rejected', 'processing', 'completed'],
+    enum: ['pending', 'approved', 'rejected', 'processing', 'completed', 'return-pending'],
     default: 'pending'
   })
   status: string;

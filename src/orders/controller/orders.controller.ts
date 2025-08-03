@@ -25,6 +25,9 @@ import { CreateOrderDto } from '../dtos/create-order.dto';
 import {
   UpdateOrderDto,
   PaginatedOrderResponseDto,
+  UpdateItemStatusDto,
+  SimpleUpdateItemStatusDto,
+  UpdateItemStatusRequestDto,
 } from '../dtos/update-order.dto';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -393,5 +396,165 @@ export class OrdersController {
   async deleteOrder(@Param('id') id: string) {
     await this.ordersService.deleteOrder(id);
     return { message: 'Đơn hàng đã được xóa thành công' };
+  }
+
+  @UseGuards(AdminGuard)
+  @Put(':id/items/:itemId/status')
+  @ApiOperation({
+    summary: 'Cập nhật trạng thái của item trong đơn hàng',
+    description: 'Cập nhật trạng thái của một item cụ thể trong đơn hàng theo ID của item',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID của đơn hàng',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiParam({
+    name: 'itemId',
+    description: 'ID của item trong đơn hàng',
+    example: '507f1f77bcf86cd799439012',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Trạng thái item đã được cập nhật thành công',
+  })
+  async updateItemStatus(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() body: UpdateItemStatusRequestDto
+  ) {
+    const order = await this.ordersService.updateItemStatusById(id, itemId, body.status);
+    return { 
+      message: 'Trạng thái item đã được cập nhật thành công',
+      order 
+    };
+  }
+
+  @UseGuards(AdminGuard)
+  @Get(':id/items/:itemId')
+  @ApiOperation({
+    summary: 'Lấy thông tin chi tiết của một item trong đơn hàng',
+    description: 'Lấy thông tin chi tiết của một item cụ thể trong đơn hàng theo ID của item',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID của đơn hàng',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiParam({
+    name: 'itemId',
+    description: 'ID của item trong đơn hàng',
+    example: '507f1f77bcf86cd799439012',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Thông tin chi tiết của item',
+  })
+  async getItemById(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string
+  ) {
+    const item = await this.ordersService.getItemById(id, itemId);
+    return { 
+      message: 'Lấy thông tin item thành công',
+      item 
+    };
+  }
+
+  @UseGuards(AdminGuard)
+  @Put(':id/items/status')
+  @ApiOperation({
+    summary: 'Cập nhật trạng thái của tất cả items trong đơn hàng',
+    description: 'Cập nhật trạng thái của tất cả items trong đơn hàng',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID của đơn hàng',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Trạng thái tất cả items đã được cập nhật thành công',
+  })
+  async updateAllItemsStatus(
+    @Param('id') id: string,
+    @Body() body: UpdateItemStatusRequestDto
+  ) {
+    const order = await this.ordersService.updateAllItemsStatus(id, body.status);
+    return { 
+      message: 'Trạng thái tất cả items đã được cập nhật thành công',
+      order 
+    };
+  }
+
+  @UseGuards(AdminGuard)
+  @Put(':id/products/:productId/status')
+  @ApiOperation({
+    summary: 'Cập nhật trạng thái của tất cả items có cùng product trong đơn hàng',
+    description: 'Cập nhật trạng thái của tất cả items có cùng product trong đơn hàng theo ID của product',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID của đơn hàng',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiParam({
+    name: 'productId',
+    description: 'ID của product',
+    example: '507f1f77bcf86cd799439013',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Trạng thái tất cả items có cùng product đã được cập nhật thành công',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Không tìm thấy items có product này trong đơn hàng',
+  })
+  async updateItemsStatusByProduct(
+    @Param('id') id: string,
+    @Param('productId') productId: string,
+    @Body() body: UpdateItemStatusRequestDto
+  ) {
+    const order = await this.ordersService.updateItemsStatusByProduct(id, productId, body.status);
+    return { 
+      message: 'Trạng thái tất cả items có cùng product đã được cập nhật thành công',
+      order 
+    };
+  }
+
+  @UseGuards(AdminGuard)
+  @Get(':id/products/:productId/items')
+  @ApiOperation({
+    summary: 'Lấy thông tin tất cả items có cùng product trong đơn hàng',
+    description: 'Lấy thông tin chi tiết của tất cả items có cùng product trong đơn hàng theo ID của product',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID của đơn hàng',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiParam({
+    name: 'productId',
+    description: 'ID của product',
+    example: '507f1f77bcf86cd799439013',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Thông tin tất cả items có cùng product',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Không tìm thấy items có product này trong đơn hàng',
+  })
+  async getItemsByProduct(
+    @Param('id') id: string,
+    @Param('productId') productId: string
+  ) {
+    const items = await this.ordersService.getItemsByProduct(id, productId);
+    return { 
+      message: 'Lấy thông tin items theo product thành công',
+      items 
+    };
   }
 }

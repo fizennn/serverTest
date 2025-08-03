@@ -180,6 +180,7 @@ export class OrdersService {
         quantity: item.quantity,
         price: foundSize.price, // Sử dụng giá của size cụ thể
         variant: `${product.name} - ${foundVariant.color} - ${foundSize.size}`, // Thông tin chi tiết variant
+        status: 'pending', // Trạng thái mặc định khi tạo đơn hàng
       };
 
       orderItems.push(orderItem);
@@ -402,7 +403,34 @@ export class OrdersService {
   }
 
   async updateToDelivered(id: string): Promise<OrderDocument> {
-    return this.updateStatus(id, { status: 'delivered' });
+    this.logger.log(`[UPDATE_TO_DELIVERED] Request received - OrderId: ${id}`);
+
+    try {
+      const order = await this.orderModel.findById(id);
+      if (!order) {
+        this.logger.error(`[UPDATE_TO_DELIVERED] Order not found - OrderId: ${id}`);
+        throw new NotFoundException('Không tìm thấy đơn hàng');
+      }
+
+      this.logger.log(`[UPDATE_TO_DELIVERED] Order found - Current status: ${order.status}, Current payment status: ${order.paymentStatus}`);
+
+      // Cập nhật trạng thái đơn hàng thành delivered
+      order.status = 'delivered';
+      
+      // Tự động cập nhật paymentStatus thành paid khi giao hàng thành công
+      if (order.paymentStatus !== 'paid') {
+        order.paymentStatus = 'paid';
+        this.logger.log(`[UPDATE_TO_DELIVERED] Auto-updating payment status to 'paid' for OrderId: ${id}`);
+      }
+
+      await order.save();
+
+      this.logger.log(`[UPDATE_TO_DELIVERED] Success - OrderId: ${id}, New status: delivered, New payment status: ${order.paymentStatus}`);
+      return order;
+    } catch (error) {
+      this.logger.error(`[UPDATE_TO_DELIVERED] Error: ${error.message}`);
+      throw error;
+    }
   }
 
   async updateToCancelled(id: string): Promise<OrderDocument> {
@@ -492,5 +520,199 @@ export class OrdersService {
     if (!order) throw new NotFoundException('No order with given ID.');
 
     await this.orderModel.findByIdAndDelete(id);
+  }
+
+  async updateItemStatus(
+    orderId: string,
+    itemIndex: number,
+    status: string
+  ): Promise<OrderDocument> {
+    if (!Types.ObjectId.isValid(orderId))
+      throw new BadRequestException('Invalid order ID.');
+
+    const order = await this.orderModel.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (itemIndex < 0 || itemIndex >= order.items.length) {
+      throw new BadRequestException('Invalid item index');
+    }
+
+    // Cập nhật status của item cụ thể
+    order.items[itemIndex].status = status;
+    await order.save();
+
+    return order;
+  }
+
+  async updateItemStatusById(
+    orderId: string,
+    itemId: string,
+    status: string
+  ): Promise<OrderDocument> {
+    if (!Types.ObjectId.isValid(orderId))
+      throw new BadRequestException('Invalid order ID.');
+
+    if (!Types.ObjectId.isValid(itemId))
+      throw new BadRequestException('Invalid item ID.');
+
+    const order = await this.orderModel.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    // Tìm item theo ID
+    const itemIndex = order.items.findIndex(item => item._id?.toString() === itemId);
+    if (itemIndex === -1) {
+      throw new NotFoundException('Item not found in order');
+    }
+
+    // Cập nhật status của item cụ thể
+    order.items[itemIndex].status = status;
+    await order.save();
+
+    return order;
+  }
+
+  async getItemById(
+    orderId: string,
+    itemId: string
+  ) {
+    if (!Types.ObjectId.isValid(orderId))
+      throw new BadRequestException('Invalid order ID.');
+
+    if (!Types.ObjectId.isValid(itemId))
+      throw new BadRequestException('Invalid item ID.');
+
+    const order = await this.orderModel.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    // Tìm item theo ID
+    const item = order.items.find(item => item._id?.toString() === itemId);
+    if (!item) {
+      throw new NotFoundException('Item not found in order');
+    }
+
+    return item;
+  }
+
+  async updateAllItemsStatus(
+    orderId: string,
+    status: string
+  ): Promise<OrderDocument> {
+    if (!Types.ObjectId.isValid(orderId))
+      throw new BadRequestException('Invalid order ID.');
+
+    const order = await this.orderModel.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    // Cập nhật status của tất cả items
+    order.items.forEach(item => {
+      item.status = status;
+    });
+    await order.save();
+
+    return order;
+  }
+
+  async updateItemsStatusByProduct(
+    orderId: string,
+    productId: string,
+    status: string
+  ): Promise<OrderDocument> {
+    if (!Types.ObjectId.isValid(orderId))
+      throw new BadRequestException('Invalid order ID.');
+
+    if (!Types.ObjectId.isValid(productId))
+      throw new BadRequestException('Invalid product ID.');
+
+    const order = await this.orderModel.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    // Debug: Log thông tin order và productId
+    console.log('Order items:', order.items);
+    console.log('Looking for productId:', productId);
+    console.log('ProductId type:', typeof productId);
+
+    // Tìm và cập nhật tất cả items có cùng product
+    // Sử dụng nhiều cách so sánh để đảm bảo tìm được
+    const updatedItems = order.items.filter(item => {
+      const itemProductId = item.product.toString();
+      const itemProductIdObj = item.product;
+      console.log('Item product:', itemProductId, 'Type:', typeof itemProductId);
+      console.log('Item product object:', itemProductIdObj);
+      
+      return itemProductId === productId || 
+             itemProductIdObj.toString() === productId ||
+             itemProductIdObj.equals(new Types.ObjectId(productId));
+    });
+
+    console.log('Found items:', updatedItems.length);
+
+    if (updatedItems.length === 0) {
+      throw new NotFoundException('No items found with this product in order');
+    }
+
+    // Cập nhật status của tất cả items có cùng product
+    order.items.forEach(item => {
+      const itemProductId = item.product.toString();
+      const itemProductIdObj = item.product;
+      
+      if (itemProductId === productId || 
+          itemProductIdObj.toString() === productId ||
+          itemProductIdObj.equals(new Types.ObjectId(productId))) {
+        item.status = status;
+        console.log('Updated item status to:', status);
+      }
+    });
+    
+    await order.save();
+
+    return order;
+  }
+
+  async getItemsByProduct(
+    orderId: string,
+    productId: string
+  ) {
+    if (!Types.ObjectId.isValid(orderId))
+      throw new BadRequestException('Invalid order ID.');
+
+    if (!Types.ObjectId.isValid(productId))
+      throw new BadRequestException('Invalid product ID.');
+
+    const order = await this.orderModel.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    // Debug: Log thông tin
+    console.log('Looking for productId:', productId);
+    console.log('Order items:', order.items);
+
+    // Tìm tất cả items có cùng product với nhiều cách so sánh
+    const items = order.items.filter(item => {
+      const itemProductId = item.product.toString();
+      const itemProductIdObj = item.product;
+      
+      return itemProductId === productId || 
+             itemProductIdObj.toString() === productId ||
+             itemProductIdObj.equals(new Types.ObjectId(productId));
+    });
+
+    console.log('Found items count:', items.length);
+
+    if (items.length === 0) {
+      throw new NotFoundException('No items found with this product in order');
+    }
+
+    return items;
   }
 }
