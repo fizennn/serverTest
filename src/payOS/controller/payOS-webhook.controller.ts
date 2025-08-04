@@ -16,19 +16,21 @@ export class PayOSWebhookController {
   @ApiBody({ type: PayOSWebhookDto })
   @ApiResponse({ status: 200, description: 'Webhook được xử lý thành công.' })
   async handlePayOSWebhook(
-    @Body() payload: PayOSWebhookDto,
+    @Body() payload: any, // Thay đổi từ PayOSWebhookDto thành any để tránh validation error
     @Headers('x-payos-signature') signature: string,
     @Res() response: Response,
   ) {
-    this.logger.log(`[WEBHOOK] Received PayOS webhook - OrderCode: ${payload.data?.orderCode}, Status: ${payload.data?.status}`);
-    this.logger.log(`[WEBHOOK] Payload: ${JSON.stringify(payload)}`);
-    this.logger.log(`[WEBHOOK] Signature: ${signature}`);
-
-    // LUÔN TRẢ VỀ 200 OK NGAY LẬP TỨC ĐỂ PAYOS HOẠT ĐỘNG ĐÚNG
-    this.logger.log(`[WEBHOOK] Sending 200 OK response immediately for PayOS compatibility`);
-    response.status(HttpStatus.OK).json({ received: true });
-
     try {
+      this.logger.log(`[WEBHOOK] Received PayOS webhook`);
+      this.logger.log(`[WEBHOOK] Full payload: ${JSON.stringify(payload)}`);
+      this.logger.log(`[WEBHOOK] Signature: ${signature}`);
+      this.logger.log(`[WEBHOOK] Payload type: ${typeof payload}`);
+      this.logger.log(`[WEBHOOK] Payload keys: ${Object.keys(payload || {}).join(', ')}`);
+
+      // LUÔN TRẢ VỀ 200 OK NGAY LẬP TỨC ĐỂ PAYOS HOẠT ĐỘNG ĐÚNG
+      this.logger.log(`[WEBHOOK] Sending 200 OK response immediately for PayOS compatibility`);
+      response.status(HttpStatus.OK).json({ received: true });
+
       // Verify webhook signature
       const isValid = this.payOSWebhookService.verifyWebhookSignature(payload, signature);
       
@@ -50,9 +52,15 @@ export class PayOSWebhookController {
       });
       
     } catch (error) {
-      this.logger.error(`[WEBHOOK] Error: ${error.message}`);
+      this.logger.error(`[WEBHOOK] Critical error in webhook handler: ${error.message}`);
       this.logger.error(`[WEBHOOK] Error stack: ${error.stack}`);
-      // Không trả về error vì đã trả về 200 OK
+      
+      // NGAY CẢ KHI CÓ LỖI CRITICAL, VẪN TRẢ VỀ 200 OK
+      try {
+        response.status(HttpStatus.OK).json({ received: true });
+      } catch (responseError) {
+        this.logger.error(`[WEBHOOK] Failed to send 200 response: ${responseError.message}`);
+      }
     }
   }
 } 

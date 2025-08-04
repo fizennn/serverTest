@@ -1,17 +1,20 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsString, IsOptional } from 'class-validator';
+import { IsNumber, IsString, IsOptional, IsObject } from 'class-validator';
 
 export class PayOSWebhookDto {
-  @ApiProperty({ example: 0, description: 'Mã lỗi (0 = thành công)' })
+  @ApiProperty({ example: 0, description: 'Mã lỗi (0 = thành công)', required: false })
+  @IsOptional()
   @IsNumber()
-  error: number;
+  error?: number;
 
-  @ApiProperty({ example: 'Success', description: 'Thông báo' })
+  @ApiProperty({ example: 'Success', description: 'Thông báo', required: false })
+  @IsOptional()
   @IsString()
-  message: string;
+  message?: string;
 
   @ApiProperty({ 
     description: 'Dữ liệu webhook',
+    required: false,
     example: {
       orderCode: '123456',
       amount: 2000000,
@@ -22,10 +25,12 @@ export class PayOSWebhookDto {
       description: 'Thanh toán đơn hàng #123456'
     }
   })
-  data: {
-    orderCode: string;
-    amount: number;
-    status: 'PAID' | 'PENDING' | 'CANCELLED' | 'EXPIRED' | 'FAILED';
+  @IsOptional()
+  @IsObject()
+  data?: {
+    orderCode?: string;
+    amount?: number;
+    status?: 'PAID' | 'PENDING' | 'CANCELLED' | 'EXPIRED' | 'FAILED';
     transactionId?: string;
     paymentMethod?: string;
     paidAt?: number;

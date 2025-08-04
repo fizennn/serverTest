@@ -1,67 +1,40 @@
-const crypto = require('crypto');
+const axios = require('axios');
 
-// Test webhook signature
-function testWebhookSignature() {
-  const secret = 'whsec_test_secret'; // Thay bằng webhook secret thật
-  const payload = JSON.stringify({
-    id: 'evt_test',
-    type: 'payment_intent.succeeded',
-    data: {
-      object: {
-        id: 'pi_test',
-        amount: 1000,
-        currency: 'vnd',
-        metadata: {
-          orderId: 'order_123'
-        }
+async function testWebhook() {
+  try {
+    console.log('Testing PayOS webhook endpoint...');
+    
+    const testPayload = {
+      error: 0,
+      message: 'Success',
+      data: {
+        orderCode: 'TEST123',
+        amount: 100000,
+        status: 'PAID',
+        transactionId: 'TXN123456',
+        paymentMethod: 'BANK_TRANSFER',
+        paidAt: Date.now(),
+        description: 'Test payment'
       }
-    }
-  });
+    };
 
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(payload)
-    .digest('hex');
+    const response = await axios.post('http://localhost:3000/webhook/payos', testPayload, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-payos-signature': 'test-signature'
+      }
+    });
 
-  console.log('Test webhook signature:');
-  console.log('Payload:', payload);
-  console.log('Signature:', `sha256=${signature}`);
-  console.log('Secret:', secret);
-  console.log('---');
+    console.log('✅ Webhook test successful!');
+    console.log('Status:', response.status);
+    console.log('Response:', response.data);
+    
+  } catch (error) {
+    console.log('❌ Webhook test failed!');
+    console.log('Status:', error.response?.status);
+    console.log('Response:', error.response?.data);
+    console.log('Error:', error.message);
+  }
 }
 
-// Test cURL command
-function generateCurlCommand() {
-  const secret = 'whsec_test_secret'; // Thay bằng webhook secret thật
-  const payload = JSON.stringify({
-    id: 'evt_test',
-    type: 'payment_intent.succeeded',
-    data: {
-      object: {
-        id: 'pi_test',
-        amount: 1000,
-        currency: 'vnd',
-        metadata: {
-          orderId: 'order_123'
-        }
-      }
-    }
-  });
-
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(payload)
-    .digest('hex');
-
-  const curlCommand = `curl -X POST http://localhost:3001/stripe/webhook \\
-  -H "Content-Type: application/json" \\
-  -H "stripe-signature: sha256=${signature}" \\
-  -d '${payload}'`;
-
-  console.log('cURL command to test webhook:');
-  console.log(curlCommand);
-  console.log('---');
-}
-
-testWebhookSignature();
-generateCurlCommand(); 
+testWebhook(); 

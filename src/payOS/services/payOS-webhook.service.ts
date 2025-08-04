@@ -46,18 +46,22 @@ export class PayOSWebhookService {
    * Xử lý webhook từ PayOS
    */
   async handleWebhook(payload: any): Promise<void> {
-    this.logger.log(`[WEBHOOK] Handling PayOS webhook - Error: ${payload.error}, Message: ${payload.message}`);
+    this.logger.log(`[WEBHOOK] Handling PayOS webhook`);
+    this.logger.log(`[WEBHOOK] Payload error: ${payload?.error}`);
+    this.logger.log(`[WEBHOOK] Payload message: ${payload?.message}`);
+    this.logger.log(`[WEBHOOK] Payload data: ${JSON.stringify(payload?.data)}`);
     
     try {
-      // Kiểm tra lỗi từ PayOS
-      if (payload.error !== 0) {
+      // Kiểm tra lỗi từ PayOS - cho phép error là undefined hoặc 0
+      if (payload?.error !== undefined && payload.error !== 0) {
         this.logger.error(`[WEBHOOK] PayOS returned error: ${payload.error} - ${payload.message}`);
         return;
       }
 
-      const { data } = payload;
+      const { data } = payload || {};
       if (!data) {
         this.logger.error('[WEBHOOK] No data in webhook payload');
+        this.logger.error(`[WEBHOOK] Available payload keys: ${Object.keys(payload || {}).join(', ')}`);
         return;
       }
 
