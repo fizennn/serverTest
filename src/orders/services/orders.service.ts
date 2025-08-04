@@ -4,6 +4,8 @@ import {
   Injectable,
   NotFoundException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -28,6 +30,7 @@ export class OrdersService {
     @InjectModel(Voucher.name) private voucherModel: Model<Voucher>,
     private productsService: ProductsService,
     private vouchersService: VouchersService,
+    @Inject(forwardRef(() => PayOSService))
     private payOSService: PayOSService,
   ) {}
 

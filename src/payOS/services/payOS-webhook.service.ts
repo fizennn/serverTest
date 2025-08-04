@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { OrdersService } from '../../orders/services/orders.service';
 import * as crypto from 'crypto';
 
@@ -7,7 +7,10 @@ export class PayOSWebhookService {
   private readonly logger = new Logger(PayOSWebhookService.name);
   private readonly PAYOS_CHECKSUM_KEY = process.env.PAYOS_CHECKSUM_KEY;
 
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    @Inject(forwardRef(() => OrdersService))
+    private readonly ordersService: OrdersService
+  ) {}
 
   /**
    * Verify webhook signature từ PayOS
