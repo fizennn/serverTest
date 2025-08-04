@@ -68,4 +68,17 @@ export class CreatePaymentDto {
   @IsString()
   @IsOptional()
   signature?: string;
+}
+
+export class CancelPaymentDto {
+  @ApiProperty({ example: 'Khách hàng yêu cầu hủy', description: 'Lý do hủy thanh toán', required: false })
+  @IsString()
+  @IsOptional()
+  cancellationReason?: string;
+}
+
+export class ConfirmWebhookDto {
+  @ApiProperty({ example: 'https://your-domain.com/webhook/payos', description: 'URL webhook để nhận callback' })
+  @IsString()
+  webhookUrl: string;
 } 

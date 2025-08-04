@@ -15,6 +15,7 @@ import { Product } from '../../products/schemas/product.schema';
 import { Voucher } from '../../vouchers/schemas/voucher.schema';
 import { ProductsService } from '../../products/services/products.service';
 import { VouchersService } from '../../vouchers/services/vouchers.service';
+import { PayOSService } from '../../payOS/services/payOS.service';
 
 @Injectable()
 export class OrdersService {
@@ -27,6 +28,7 @@ export class OrdersService {
     @InjectModel(Voucher.name) private voucherModel: Model<Voucher>,
     private productsService: ProductsService,
     private vouchersService: VouchersService,
+    private payOSService: PayOSService,
   ) {}
 
   async cancelUserOrder(orderId: string, userId: string) {
@@ -252,6 +254,9 @@ export class OrdersService {
     // Tính tổng tiền cuối cùng
     const total = subtotal - itemDiscount + (finalShipCost - shipDiscount);
 
+    // Tạo orderCode cho PayOS (sử dụng timestamp để tạo số duy nhất)
+    const orderCode = Math.floor(Date.now() / 1000) % 1000000; // 6 chữ số
+
     try {
       // Tạo order với đầy đủ dữ liệu
       const orderData = {
@@ -273,6 +278,7 @@ export class OrdersService {
         status: 'pending',
         vouchers: orderVouchers,
         paymentStatus: 'unpaid',
+        orderCode, // Thêm orderCode cho PayOS
       };
 
       // Log để debug
@@ -293,6 +299,8 @@ export class OrdersService {
         atStore,
         'Payment:',
         payment,
+        'OrderCode:',
+        orderCode,
       );
 
       const createdOrder = await this.orderModel.create(orderData);
@@ -714,5 +722,87 @@ export class OrdersService {
     }
 
     return items;
+  }
+
+  async checkPaymentStatus(orderId: string) {
+    this.logger.log(`[CHECK_PAYMENT_STATUS] Request received - OrderId: ${orderId}`);
+
+    try {
+      // 1. Lấy thông tin đơn hàng
+      const order = await this.orderModel.findById(orderId);
+      if (!order) {
+        this.logger.error(`[CHECK_PAYMENT_STATUS] Order not found - OrderId: ${orderId}`);
+        throw new NotFoundException('Không tìm thấy đơn hàng');
+      }
+
+      this.logger.log(`[CHECK_PAYMENT_STATUS] Order found - Current payment status: ${order.paymentStatus}`);
+
+      // 2. Kiểm tra nếu đơn hàng chưa được thanh toán
+      if (order.paymentStatus === 'unpaid' && order.payment === 'payOS') {
+        this.logger.log(`[CHECK_PAYMENT_STATUS] Order is unpaid and uses payOS - checking payment status`);
+
+        // Kiểm tra xem có orderCode không
+        if (!order.orderCode) {
+          this.logger.error(`[CHECK_PAYMENT_STATUS] Order has no orderCode - OrderId: ${orderId}`);
+          return { 
+            message: 'Đơn hàng không có mã thanh toán PayOS', 
+            paymentStatus: order.paymentStatus,
+            order 
+          };
+        }
+
+        try {
+          // 3. Gọi API PayOS để kiểm tra trạng thái thanh toán
+          const paymentInfo = await this.payOSService.getPaymentLinkInformation(order.orderCode.toString());
+          
+          this.logger.log(`[CHECK_PAYMENT_STATUS] PayOS response:`, paymentInfo);
+
+          // 4. Kiểm tra trạng thái thanh toán từ PayOS
+          if (paymentInfo && paymentInfo.status === 'PAID') {
+            this.logger.log(`[CHECK_PAYMENT_STATUS] Payment confirmed by PayOS - updating order status`);
+            
+            // 5. Cập nhật trạng thái thanh toán thành 'paid'
+            order.paymentStatus = 'paid';
+            await order.save();
+
+            this.logger.log(`[CHECK_PAYMENT_STATUS] Success - OrderId: ${orderId}, Payment status updated to: paid`);
+            
+            return { 
+              message: 'Thanh toán đã được xác nhận', 
+              paymentStatus: 'paid',
+              order 
+            };
+          } else {
+            this.logger.log(`[CHECK_PAYMENT_STATUS] Payment not confirmed by PayOS - status: ${paymentInfo?.status}`);
+            
+            return { 
+              message: 'Đơn hàng chưa được thanh toán', 
+              paymentStatus: 'unpaid',
+              order 
+            };
+          }
+        } catch (payOSError) {
+          this.logger.error(`[CHECK_PAYMENT_STATUS] PayOS API error: ${payOSError.message}`);
+          
+          return { 
+            message: 'Không thể kiểm tra trạng thái thanh toán từ PayOS', 
+            paymentStatus: order.paymentStatus,
+            order,
+            error: payOSError.message
+          };
+        }
+      } else {
+        this.logger.log(`[CHECK_PAYMENT_STATUS] Order payment status: ${order.paymentStatus}, payment method: ${order.payment}`);
+        
+        return { 
+          message: 'Đơn hàng không cần kiểm tra thanh toán', 
+          paymentStatus: order.paymentStatus,
+          order 
+        };
+      }
+    } catch (error) {
+      this.logger.error(`[CHECK_PAYMENT_STATUS] Error: ${error.message}`);
+      throw error;
+    }
   }
 }

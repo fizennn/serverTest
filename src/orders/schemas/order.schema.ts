@@ -227,6 +227,14 @@ export class Order {
   })
   @Prop({ required: true, default: 'unpaid', enum: ['unpaid', 'paid', 'refunded'] })
   paymentStatus!: string;
+
+  @ApiProperty({
+    description: 'Mã đơn hàng cho PayOS (số nguyên)',
+    example: 123456,
+    required: false,
+  })
+  @Prop({ required: false, type: Number })
+  orderCode?: number;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

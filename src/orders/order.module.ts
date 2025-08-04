@@ -8,6 +8,7 @@ import { Product, ProductSchema } from '../products/schemas/product.schema';
 import { Voucher, VoucherSchema } from '../vouchers/schemas/voucher.schema';
 import { ProductsModule } from '../products/products.module';
 import { VouchersModule } from '../vouchers/vouchers.module';
+import { PayOSModule } from '../payOS/payOS.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { VouchersModule } from '../vouchers/vouchers.module';
     ]),
     ProductsModule,
     VouchersModule,
+    PayOSModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

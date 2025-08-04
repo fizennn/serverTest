@@ -557,4 +557,36 @@ export class OrdersController {
       items 
     };
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/check-payment-status')
+  @ApiOperation({
+    summary: 'Kiểm tra trạng thái thanh toán của đơn hàng',
+    description: 'Kiểm tra trạng thái thanh toán của đơn hàng. Nếu đơn hàng chưa thanh toán và sử dụng payOS, sẽ gọi API PayOS để kiểm tra và cập nhật trạng thái.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID của đơn hàng',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Trạng thái thanh toán đã được kiểm tra',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Thanh toán đã được xác nhận' },
+        paymentStatus: { type: 'string', enum: ['unpaid', 'paid', 'refunded'], example: 'paid' },
+        order: { type: 'object' },
+        error: { type: 'string' }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Không tìm thấy đơn hàng',
+  })
+  async checkPaymentStatus(@Param('id') id: string) {
+    return this.ordersService.checkPaymentStatus(id);
+  }
 }

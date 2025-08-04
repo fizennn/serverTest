@@ -15,7 +15,7 @@ export class PayOSService {
     return crypto.createHmac('sha256', this.PAYOS_CHECKSUM_KEY).update(rawString).digest('hex');
   }
 
-  async createPayment(dto: CreatePaymentDto): Promise<string> {
+  async createPayment(dto: CreatePaymentDto): Promise<any> {
     // Tự động set expiredAt là 1 ngày kể từ thời điểm tạo nếu chưa hợp lệ
     const now = Math.floor(Date.now() / 1000);
     let expiredAt = dto.expiredAt;
@@ -42,10 +42,61 @@ export class PayOSService {
         },
       });
       console.log('PayOS response:', response.data);
-      return response.data?.data?.checkoutUrl;
+      return response.data?.data;
     } catch (err) {
       console.error('PayOS error:', err.response?.data || err.message);
       throw new Error('Lỗi tạo mã QR thanh toán');
+    }
+  }
+
+  async getPaymentLinkInformation(orderCode: string): Promise<any> {
+    try {
+      const response = await axios.get(`${this.PAYOS_API}/${orderCode}`, {
+        headers: {
+          'x-client-id': this.PAYOS_CLIENT_ID,
+          'x-api-key': this.PAYOS_API_KEY,
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.data?.data;
+    } catch (err) {
+      console.error('PayOS get payment info error:', err.response?.data || err.message);
+      throw new Error('Lỗi lấy thông tin thanh toán');
+    }
+  }
+
+  async cancelPaymentLink(orderCode: string, cancellationReason?: string): Promise<any> {
+    try {
+      const body = cancellationReason ? { cancellationReason } : {};
+      const response = await axios.put(`${this.PAYOS_API}/${orderCode}/cancel`, body, {
+        headers: {
+          'x-client-id': this.PAYOS_CLIENT_ID,
+          'x-api-key': this.PAYOS_API_KEY,
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.data?.data;
+    } catch (err) {
+      console.error('PayOS cancel payment error:', err.response?.data || err.message);
+      throw new Error('Lỗi hủy thanh toán');
+    }
+  }
+
+  async confirmWebhook(webhookUrl: string): Promise<any> {
+    try {
+      const response = await axios.post(`${this.PAYOS_API}/webhook`, {
+        webhookUrl
+      }, {
+        headers: {
+          'x-client-id': this.PAYOS_CLIENT_ID,
+          'x-api-key': this.PAYOS_API_KEY,
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.data?.data;
+    } catch (err) {
+      console.error('PayOS confirm webhook error:', err.response?.data || err.message);
+      throw new Error('Lỗi xác nhận webhook');
     }
   }
 } 
