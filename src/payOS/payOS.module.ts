@@ -4,10 +4,10 @@ import { PayOSWebhookController } from './controller/payOS-webhook.controller';
 import { PayOSService } from './services/payOS.service';
 import { PayOSWebhookService } from './services/payOS-webhook.service';
 import { ProductsModule } from '../products/products.module';
-import { OrdersModule } from '../orders/order.module';
+import { OrderModule } from '../orders/order.module';
 
 @Module({
-  imports: [ProductsModule, OrdersModule],
+  imports: [ProductsModule, OrderModule],
   controllers: [PayOSController, PayOSWebhookController],
   providers: [PayOSService, PayOSWebhookService],
   exports: [PayOSService, PayOSWebhookService],
