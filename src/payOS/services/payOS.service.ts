@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
-import { CreatePaymentDto } from '../dtos/create-payment.dto';
+import { CreatePaymentDto, SimpleCreatePaymentDto } from '../dtos/create-payment.dto';
 import * as crypto from 'crypto';
+import { ProductsService } from '../../products/services/products.service';
 
 @Injectable()
 export class PayOSService {
@@ -10,9 +11,66 @@ export class PayOSService {
   private readonly PAYOS_API_KEY = process.env.PAYOS_API_KEY;
   private readonly PAYOS_CHECKSUM_KEY = process.env.PAYOS_CHECKSUM_KEY;
 
+  constructor(private readonly productsService: ProductsService) {}
+
   private createSignature(data: CreatePaymentDto): string {
     const rawString = `amount=${data.amount}&cancelUrl=${data.cancelUrl}&description=${data.description}&orderCode=${data.orderCode}&returnUrl=${data.returnUrl}`;
     return crypto.createHmac('sha256', this.PAYOS_CHECKSUM_KEY).update(rawString).digest('hex');
+  }
+
+  // Method mới để tạo thanh toán đơn giản
+  async createSimplePayment(dto: SimpleCreatePaymentDto): Promise<any> {
+    try {
+      // Lấy thông tin sản phẩm từ database
+      const product = await this.productsService.findById(dto.productId);
+      console.log('Product found:', product);
+      
+      // Sử dụng amount từ người dùng thay vì tính toán
+      const totalAmount = dto.amount;
+      
+      // Tạo orderCode ngẫu nhiên
+      const orderCode = Math.floor(Math.random() * 1000000) + 100000;
+      
+      // Tạo description - đảm bảo là string
+      const productName = product.name || 'Sản phẩm';
+      const description = `Thanh toán cho ${productName} - Số lượng: ${dto.quantity}`;
+      console.log('Description:', description);
+      
+      // Tạo items array với giá từ amount - đảm bảo là array
+      const itemPrice = totalAmount / dto.quantity; // Tính giá đơn vị
+      const items = [{
+        name: productName,
+        quantity: dto.quantity,
+        price: itemPrice
+      }];
+      console.log('Items:', items);
+
+      // Tạo URL mặc định
+      const baseUrl = process.env.BASE_URL || 'https://fizennn.click';
+      const cancelUrl = `${baseUrl}/payment/cancel`;
+      const returnUrl = `${baseUrl}/payment/success`;
+
+      // Tạo DTO đầy đủ
+      const fullDto: CreatePaymentDto = {
+        orderCode,
+        amount: totalAmount,
+        description,
+        buyerName: dto.buyerName || 'Khách hàng',
+        buyerEmail: dto.buyerEmail || 'customer@example.com',
+        buyerPhone: dto.buyerPhone || '0900000000',
+        buyerAddress: dto.buyerAddress || 'Địa chỉ mặc định',
+        items,
+        cancelUrl,
+        returnUrl
+      };
+      console.log('Full DTO:', fullDto);
+
+      // Gọi method tạo thanh toán gốc
+      return await this.createPayment(fullDto);
+    } catch (error) {
+      console.error('Error creating simple payment:', error);
+      throw new Error('Lỗi tạo thanh toán đơn giản');
+    }
   }
 
   async createPayment(dto: CreatePaymentDto): Promise<any> {

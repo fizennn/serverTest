@@ -16,6 +16,41 @@ class PayOSItemDto {
   price: number;
 }
 
+// DTO mới đơn giản chỉ cần productId, quantity và amount
+export class SimpleCreatePaymentDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'ID sản phẩm' })
+  @IsString()
+  productId: string;
+
+  @ApiProperty({ example: 2, description: 'Số lượng sản phẩm' })
+  @IsNumber()
+  quantity: number;
+
+  @ApiProperty({ example: 2000, description: 'Số tiền thanh toán (VNĐ)' })
+  @IsNumber()
+  amount: number;
+
+  @ApiProperty({ example: 'Nguyen Van A', description: 'Tên người mua', required: false })
+  @IsString()
+  @IsOptional()
+  buyerName?: string;
+
+  @ApiProperty({ example: 'buyer-email@gmail.com', description: 'Email người mua', required: false })
+  @IsEmail()
+  @IsOptional()
+  buyerEmail?: string;
+
+  @ApiProperty({ example: '090xxxxxxx', description: 'Số điện thoại người mua', required: false })
+  @IsString()
+  @IsOptional()
+  buyerPhone?: string;
+
+  @ApiProperty({ example: 'số nhà, đường, phường, tỉnh hoặc thành phố', description: 'Địa chỉ người mua', required: false })
+  @IsString()
+  @IsOptional()
+  buyerAddress?: string;
+}
+
 export class CreatePaymentDto {
   @ApiProperty({ example: 123, description: 'Mã đơn hàng (orderCode)' })
   @IsNumber()

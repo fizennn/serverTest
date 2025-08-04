@@ -96,15 +96,16 @@ export class Order {
   _id!: mongoose.Types.ObjectId;
 
   @ApiProperty({
-    description: 'ID của người dùng đặt hàng',
+    description: 'ID của người dùng đặt hàng (null cho guest)',
     example: '507f1f77bcf86cd799439012',
+    required: false,
   })
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
-    required: true,
+    required: false,
     ref: 'User',
   })
-  idUser!: User;
+  idUser?: User;
 
   @ApiProperty({
     description: 'Xác định đơn hàng mua tại cửa hàng (không tính phí ship)',
@@ -147,6 +148,24 @@ export class Order {
     phone: string;
     address: string;
     name?: string;
+  };
+
+  @ApiProperty({
+    description: 'Thông tin khách hàng guest (cho đơn hàng mua trực tiếp tại shop)',
+    required: false,
+  })
+  @Prop({
+    required: false,
+    type: {
+      name: { type: String, required: true },
+      phone: { type: String, required: true },
+      email: { type: String, required: false },
+    },
+  })
+  guestCustomer?: {
+    name: string;
+    phone: string;
+    email?: string;
   };
 
   @ApiProperty({

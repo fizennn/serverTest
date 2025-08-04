@@ -8,7 +8,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Order, OrderDocument } from '../schemas/order.schema';
-import { CreateOrderDto } from '../dtos/create-order.dto';
+import { CreateOrderDto, CreateOrderAdminDto, CreateOrderGuestDto } from '../dtos/create-order.dto';
 import { UpdateOrderDto } from '../dtos/update-order.dto';
 import { User } from '../../users/schemas/user.schema';
 import { Product } from '../../products/schemas/product.schema';
@@ -322,6 +322,464 @@ export class OrdersService {
     }
   }
 
+  async createForAdmin(
+    orderAttrs: CreateOrderAdminDto,
+  ): Promise<OrderDocument> {
+    const {
+      userId,
+      items,
+      note,
+      vouchers,
+      storeAddress,
+      shipCost,
+      atStore = false,
+      payment = 'COD',
+      status = 'pending',
+      paymentStatus = 'unpaid',
+    } = orderAttrs;
+
+    if (items && items.length < 1)
+      throw new BadRequestException('No order items received.');
+
+    // Kiểm tra user có tồn tại không
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Lấy thông tin sản phẩm và tạo order items
+    const orderItems = [];
+    let subtotal = 0; // Tổng tiền sản phẩm trước khi áp dụng voucher
+
+    for (const item of items) {
+      // Sử dụng method có sẵn để lấy thông tin sản phẩm theo sizeId
+      const products = await this.productsService.findBySizeId(item.sizeId);
+
+      if (!products || products.length === 0) {
+        throw new BadRequestException(
+          `Không tìm thấy sản phẩm với size ID ${item.sizeId}`,
+        );
+      }
+
+      // Lấy sản phẩm đầu tiên (vì findBySizeId trả về array)
+      const filteredProduct = products[0];
+
+      // Lấy product gốc từ database để có thể save
+      const product = await this.productModel.findById(filteredProduct._id);
+      if (!product) {
+        throw new BadRequestException(
+          `Không tìm thấy sản phẩm với ID ${filteredProduct._id}`,
+        );
+      }
+
+      // Tìm size cụ thể trong product
+      let foundSize = null;
+      let foundVariant = null;
+
+      for (const variant of product.variants) {
+        const size = variant.sizes.find(
+          (s: any) => s._id.toString() === item.sizeId,
+        );
+        if (size) {
+          foundSize = size;
+          foundVariant = variant;
+          break;
+        }
+      }
+
+      if (!foundSize) {
+        throw new BadRequestException(
+          `Không tìm thấy size với ID ${item.sizeId}`,
+        );
+      }
+
+      // Kiểm tra số lượng tồn kho của size cụ thể
+      if (item.quantity > foundSize.stock) {
+        throw new BadRequestException(
+          `Not enough stock for size ${foundSize.size} of product ${product.name}. Available: ${foundSize.stock}`,
+        );
+      }
+
+      // Tính tổng tiền sản phẩm
+      const itemTotal = foundSize.price * item.quantity;
+      subtotal += itemTotal;
+
+      // Tạo order item object với thông tin đầy đủ
+      const orderItem = {
+        product: new Types.ObjectId(product._id),
+        quantity: item.quantity,
+        price: foundSize.price, // Sử dụng giá của size cụ thể
+        variant: `${product.name} - ${foundVariant.color} - ${foundSize.size}`, // Thông tin chi tiết variant
+        status: 'pending', // Trạng thái mặc định khi tạo đơn hàng
+      };
+
+      orderItems.push(orderItem);
+
+      // Cập nhật số lượng tồn kho của size cụ thể
+      foundSize.stock -= item.quantity;
+      await product.save();
+    }
+
+    // Tính toán phí ship dựa trên atStore
+    const finalShipCost = atStore ? 0 : (shipCost || 0);
+
+    // Tính toán discount từ voucher
+    let itemDiscount = 0; // Giảm giá cho sản phẩm
+    let shipDiscount = 0; // Giảm giá cho phí vận chuyển
+    const orderVouchers = [];
+
+    if (vouchers && vouchers.length > 0) {
+      for (const voucherId of vouchers) {
+        if (!Types.ObjectId.isValid(voucherId)) {
+          throw new BadRequestException(`Invalid voucher ID: ${voucherId}`);
+        }
+
+        // Lấy thông tin voucher từ database
+        const voucher = await this.voucherModel.findById(voucherId);
+        if (!voucher) {
+          throw new BadRequestException(`Voucher not found: ${voucherId}`);
+        }
+
+        // Sử dụng VouchersService để tính toán discount
+        const voucherResult =
+          await this.vouchersService.calculateVoucherDiscount(
+            voucherId,
+            userId,
+            subtotal,
+            finalShipCost,
+          );
+
+        if (!voucherResult.valid) {
+          throw new BadRequestException(
+            `Voucher ${voucherId}: ${voucherResult.message}`,
+          );
+        }
+
+        // Cộng dồn discount
+        itemDiscount += voucherResult.itemDiscount;
+        shipDiscount += voucherResult.shipDiscount;
+
+        // Tạo snapshot voucher cho order
+        const orderVoucher = {
+          voucherId: voucherId,
+          type: voucher.type,
+          disCount: voucher.disCount,
+          condition: voucher.condition,
+          limit: voucher.limit,
+          appliedDiscount:
+            voucherResult.itemDiscount + voucherResult.shipDiscount,
+        };
+
+        orderVouchers.push(orderVoucher);
+
+        // Giảm stock của voucher
+        await this.voucherModel.findByIdAndUpdate(voucherId, {
+          $inc: { stock: -1 },
+        });
+      }
+    }
+
+    // Tính tổng tiền cuối cùng
+    const total = subtotal - itemDiscount + (finalShipCost - shipDiscount);
+
+    // Tạo orderCode cho PayOS (sử dụng timestamp để tạo số duy nhất)
+    const orderCode = Math.floor(Date.now() / 1000) % 1000000; // 6 chữ số
+
+    try {
+      // Tạo order với đầy đủ dữ liệu (không có address)
+      const orderData = {
+        idUser: new Types.ObjectId(userId),
+        atStore,
+        payment,
+        address: null, // Admin không cần address
+        items: orderItems,
+        note: note || '',
+        subtotal, // Tổng tiền sản phẩm trước khi giảm giá
+        itemDiscount, // Giảm giá cho sản phẩm
+        shipDiscount, // Giảm giá cho phí vận chuyển
+        total,
+        storeAddress: storeAddress || '',
+        shipCost: finalShipCost,
+        status,
+        vouchers: orderVouchers,
+        paymentStatus,
+        orderCode, // Thêm orderCode cho PayOS
+      };
+
+      // Log để debug
+      console.log(
+        'Creating admin order with data:',
+        JSON.stringify(orderData, null, 2),
+      );
+      console.log(
+        'Subtotal:',
+        subtotal,
+        'Item Discount:',
+        itemDiscount,
+        'Ship Discount:',
+        shipDiscount,
+        'Total:',
+        total,
+        'At Store:',
+        atStore,
+        'Payment:',
+        payment,
+        'OrderCode:',
+        orderCode,
+        'Status:',
+        status,
+        'PaymentStatus:',
+        paymentStatus,
+      );
+
+      const createdOrder = await this.orderModel.create(orderData);
+      console.log('Created admin order:', createdOrder);
+
+      // Populate dữ liệu để trả về đầy đủ thông tin
+      const populatedOrder = await this.orderModel
+        .findById(createdOrder._id)
+        .populate('idUser', 'name email')
+        .populate('items.product', 'name images price')
+        .exec();
+
+      console.log('Populated admin order vouchers:', populatedOrder.vouchers);
+      return populatedOrder;
+    } catch (error) {
+      // Log lỗi để debug
+      console.error('Error creating admin order:', error);
+      throw error;
+    }
+  }
+
+  async createForGuest(
+    orderAttrs: CreateOrderGuestDto,
+  ): Promise<OrderDocument> {
+    const {
+      customerInfo,
+      items,
+      note,
+      vouchers,
+      storeAddress,
+      shipCost,
+      atStore = true, // Mặc định là mua tại shop
+      payment = 'COD',
+      status = 'confirmed', // Mặc định là confirmed vì đã thanh toán tại shop
+      paymentStatus = 'paid', // Mặc định là paid vì đã thanh toán tại shop
+    } = orderAttrs;
+
+    if (items && items.length < 1)
+      throw new BadRequestException('No order items received.');
+
+    // Lấy thông tin sản phẩm và tạo order items
+    const orderItems = [];
+    let subtotal = 0; // Tổng tiền sản phẩm trước khi áp dụng voucher
+
+    for (const item of items) {
+      // Sử dụng method có sẵn để lấy thông tin sản phẩm theo sizeId
+      const products = await this.productsService.findBySizeId(item.sizeId);
+
+      if (!products || products.length === 0) {
+        throw new BadRequestException(
+          `Không tìm thấy sản phẩm với size ID ${item.sizeId}`,
+        );
+      }
+
+      // Lấy sản phẩm đầu tiên (vì findBySizeId trả về array)
+      const filteredProduct = products[0];
+
+      // Lấy product gốc từ database để có thể save
+      const product = await this.productModel.findById(filteredProduct._id);
+      if (!product) {
+        throw new BadRequestException(
+          `Không tìm thấy sản phẩm với ID ${filteredProduct._id}`,
+        );
+      }
+
+      // Tìm size cụ thể trong product
+      let foundSize = null;
+      let foundVariant = null;
+
+      for (const variant of product.variants) {
+        const size = variant.sizes.find(
+          (s: any) => s._id.toString() === item.sizeId,
+        );
+        if (size) {
+          foundSize = size;
+          foundVariant = variant;
+          break;
+        }
+      }
+
+      if (!foundSize) {
+        throw new BadRequestException(
+          `Không tìm thấy size với ID ${item.sizeId}`,
+        );
+      }
+
+      // Kiểm tra số lượng tồn kho của size cụ thể
+      if (item.quantity > foundSize.stock) {
+        throw new BadRequestException(
+          `Not enough stock for size ${foundSize.size} of product ${product.name}. Available: ${foundSize.stock}`,
+        );
+      }
+
+      // Tính tổng tiền sản phẩm
+      const itemTotal = foundSize.price * item.quantity;
+      subtotal += itemTotal;
+
+      // Tạo order item object với thông tin đầy đủ
+      const orderItem = {
+        product: new Types.ObjectId(product._id),
+        quantity: item.quantity,
+        price: foundSize.price, // Sử dụng giá của size cụ thể
+        variant: `${product.name} - ${foundVariant.color} - ${foundSize.size}`, // Thông tin chi tiết variant
+        status: 'pending', // Trạng thái mặc định khi tạo đơn hàng
+      };
+
+      orderItems.push(orderItem);
+
+      // Cập nhật số lượng tồn kho của size cụ thể
+      foundSize.stock -= item.quantity;
+      await product.save();
+    }
+
+    // Tính toán phí ship dựa trên atStore
+    const finalShipCost = atStore ? 0 : (shipCost || 0);
+
+    // Tính toán discount từ voucher
+    let itemDiscount = 0; // Giảm giá cho sản phẩm
+    let shipDiscount = 0; // Giảm giá cho phí vận chuyển
+    const orderVouchers = [];
+
+    if (vouchers && vouchers.length > 0) {
+      for (const voucherId of vouchers) {
+        if (!Types.ObjectId.isValid(voucherId)) {
+          throw new BadRequestException(`Invalid voucher ID: ${voucherId}`);
+        }
+
+        // Lấy thông tin voucher từ database
+        const voucher = await this.voucherModel.findById(voucherId);
+        if (!voucher) {
+          throw new BadRequestException(`Voucher not found: ${voucherId}`);
+        }
+
+        // Sử dụng VouchersService để tính toán discount
+        const voucherResult =
+          await this.vouchersService.calculateVoucherDiscount(
+            voucherId,
+            null, // Không có userId cho guest
+            subtotal,
+            finalShipCost,
+          );
+
+        if (!voucherResult.valid) {
+          throw new BadRequestException(
+            `Voucher ${voucherId}: ${voucherResult.message}`,
+          );
+        }
+
+        // Cộng dồn discount
+        itemDiscount += voucherResult.itemDiscount;
+        shipDiscount += voucherResult.shipDiscount;
+
+        // Tạo snapshot voucher cho order
+        const orderVoucher = {
+          voucherId: voucherId,
+          type: voucher.type,
+          disCount: voucher.disCount,
+          condition: voucher.condition,
+          limit: voucher.limit,
+          appliedDiscount:
+            voucherResult.itemDiscount + voucherResult.shipDiscount,
+        };
+
+        orderVouchers.push(orderVoucher);
+
+        // Giảm stock của voucher
+        await this.voucherModel.findByIdAndUpdate(voucherId, {
+          $inc: { stock: -1 },
+        });
+      }
+    }
+
+    // Tính tổng tiền cuối cùng
+    const total = subtotal - itemDiscount + (finalShipCost - shipDiscount);
+
+    // Tạo orderCode cho PayOS (sử dụng timestamp để tạo số duy nhất)
+    const orderCode = Math.floor(Date.now() / 1000) % 1000000; // 6 chữ số
+
+    try {
+      // Tạo order với thông tin guest customer
+      const orderData = {
+        idUser: null, // Không có userId cho guest
+        guestCustomer: {
+          name: customerInfo.name,
+          phone: customerInfo.phone,
+          email: customerInfo.email || '',
+        },
+        atStore,
+        payment,
+        address: null, // Không có address cho guest
+        items: orderItems,
+        note: note || '',
+        subtotal, // Tổng tiền sản phẩm trước khi giảm giá
+        itemDiscount, // Giảm giá cho sản phẩm
+        shipDiscount, // Giảm giá cho phí vận chuyển
+        total,
+        storeAddress: storeAddress || '',
+        shipCost: finalShipCost,
+        status,
+        vouchers: orderVouchers,
+        paymentStatus,
+        orderCode, // Thêm orderCode cho PayOS
+      };
+
+      // Log để debug
+      console.log(
+        'Creating guest order with data:',
+        JSON.stringify(orderData, null, 2),
+      );
+      console.log(
+        'Guest Customer Info:',
+        customerInfo,
+        'Subtotal:',
+        subtotal,
+        'Item Discount:',
+        itemDiscount,
+        'Ship Discount:',
+        shipDiscount,
+        'Total:',
+        total,
+        'At Store:',
+        atStore,
+        'Payment:',
+        payment,
+        'OrderCode:',
+        orderCode,
+        'Status:',
+        status,
+        'PaymentStatus:',
+        paymentStatus,
+      );
+
+      const createdOrder = await this.orderModel.create(orderData);
+      console.log('Created guest order:', createdOrder);
+
+      // Populate dữ liệu để trả về đầy đủ thông tin
+      const populatedOrder = await this.orderModel
+        .findById(createdOrder._id)
+        .populate('items.product', 'name images price')
+        .exec();
+
+      console.log('Populated guest order vouchers:', populatedOrder.vouchers);
+      return populatedOrder;
+    } catch (error) {
+      // Log lỗi để debug
+      console.error('Error creating guest order:', error);
+      throw error;
+    }
+  }
+
   async findAll(
     page = 1,
     limit = 10,
@@ -445,7 +903,7 @@ export class OrdersService {
     return this.updateStatus(id, { status: 'cancelled' });
   }
 
-  async updatePaymentStatus(id: string, paymentStatus: 'unpaid' | 'paid' | 'refunded') {
+  async updatePaymentStatus(id: string, paymentStatus: 'unpaid' | 'paid' | 'refunded' | 'cancelled' | 'expired' | 'failed' | 'pending') {
     this.logger.log(`[UPDATE_PAYMENT_STATUS] Request received - OrderId: ${id}, PaymentStatus: ${paymentStatus}`);
 
     try {

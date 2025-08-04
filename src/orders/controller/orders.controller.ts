@@ -21,7 +21,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { CreateOrderDto } from '../dtos/create-order.dto';
+import { CreateOrderDto, CreateOrderAdminDto, CreateOrderGuestDto } from '../dtos/create-order.dto';
 import {
   UpdateOrderDto,
   PaginatedOrderResponseDto,
@@ -190,6 +190,277 @@ export class OrdersController {
     @CurrentUser() user: UserDocument,
   ) {
     return this.ordersService.create(createOrderDto, user._id.toString());
+  }
+
+  @UseGuards(AdminGuard)
+  @Post('admin')
+  @ApiOperation({
+    summary: 'Tạo đơn hàng mới cho admin',
+    description:
+      'Tạo đơn hàng mới dành cho admin mà không cần truyền vào address. Admin có thể chỉ định trạng thái đơn hàng và trạng thái thanh toán ngay từ đầu.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Đơn hàng được tạo thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        _id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+        idUser: {
+          type: 'object',
+          properties: {
+            _id: { type: 'string', example: '507f1f77bcf86cd799439012' },
+            name: { type: 'string', example: 'Nguyễn Văn A' },
+            email: { type: 'string', example: 'user@example.com' },
+          },
+        },
+        atStore: {
+          type: 'boolean',
+          example: false,
+          description:
+            'Xác định đơn hàng mua tại cửa hàng (không tính phí ship)',
+        },
+        payment: {
+          type: 'string',
+          example: 'COD',
+          description:
+            'Phương thức thanh toán (COD: tiền mặt, payOS: chuyển khoản)',
+        },
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              product: {
+                type: 'object',
+                properties: {
+                  _id: { type: 'string', example: '507f1f77bcf86cd799439013' },
+                  name: { type: 'string', example: 'Áo thun nam' },
+                  images: { type: 'array', items: { type: 'string' } },
+                  price: { type: 'number', example: 500000 },
+                },
+              },
+              quantity: { type: 'number', example: 2 },
+              price: { type: 'number', example: 500000 },
+              variant: { type: 'string', example: 'Áo thun nam - Đỏ - M' },
+            },
+          },
+        },
+        vouchers: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              voucherId: {
+                type: 'string',
+                example: '68565473537f64f28418e85c',
+                description: 'ID của voucher',
+              },
+              type: {
+                type: 'string',
+                example: 'item',
+                enum: ['item', 'ship'],
+                description: 'Loại voucher',
+              },
+              disCount: {
+                type: 'number',
+                example: 10,
+                description: 'Phần trăm giảm giá (%) tại thời điểm tạo order',
+              },
+              condition: {
+                type: 'number',
+                example: 500000,
+                description:
+                  'Điều kiện tối thiểu (VNĐ) tại thời điểm tạo order',
+              },
+              limit: {
+                type: 'number',
+                example: 100000,
+                description:
+                  'Giới hạn giảm giá tối đa (VNĐ) tại thời điểm tạo order',
+              },
+              appliedDiscount: {
+                type: 'number',
+                example: 50000,
+                description: 'Số tiền giảm giá thực tế được áp dụng',
+              },
+            },
+          },
+          description:
+            'Snapshot thông tin voucher tại thời điểm tạo order (không thay đổi sau này)',
+        },
+        subtotal: {
+          type: 'number',
+          example: 1000000,
+          description: 'Tổng tiền sản phẩm trước giảm giá',
+        },
+        itemDiscount: {
+          type: 'number',
+          example: 50000,
+          description: 'Tổng giảm giá cho sản phẩm',
+        },
+        shipDiscount: {
+          type: 'number',
+          example: 10000,
+          description: 'Tổng giảm giá cho vận chuyển',
+        },
+        total: {
+          type: 'number',
+          example: 940000,
+          description: 'Tổng tiền cuối cùng sau khi áp dụng voucher',
+        },
+        shipCost: {
+          type: 'number',
+          example: 30000,
+          description: 'Phí vận chuyển (0 nếu atStore = true)',
+        },
+        status: { type: 'string', example: 'pending' },
+        paymentStatus: { type: 'string', example: 'unpaid' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Dữ liệu không hợp lệ, sản phẩm không tồn tại, không đủ tồn kho, hoặc voucher không hợp lệ',
+  })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy user' })
+  async createOrderForAdmin(
+    @Body() createOrderAdminDto: CreateOrderAdminDto,
+  ) {
+    return this.ordersService.createForAdmin(createOrderAdminDto);
+  }
+
+  @UseGuards(AdminGuard)
+  @Post('admin/guest')
+  @ApiOperation({
+    summary: 'Tạo đơn hàng cho khách hàng guest (mua trực tiếp tại shop)',
+    description:
+      'Tạo đơn hàng cho khách hàng không có tài khoản (guest) mua trực tiếp tại shop. Không cần userId, chỉ cần thông tin cơ bản của khách hàng.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Đơn hàng được tạo thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        _id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+        guestCustomer: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', example: 'Nguyễn Văn A' },
+            phone: { type: 'string', example: '0123456789' },
+            email: { type: 'string', example: 'guest@example.com' },
+          },
+        },
+        atStore: {
+          type: 'boolean',
+          example: true,
+          description: 'Xác định đơn hàng mua tại cửa hàng',
+        },
+        payment: {
+          type: 'string',
+          example: 'COD',
+          description: 'Phương thức thanh toán',
+        },
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              product: {
+                type: 'object',
+                properties: {
+                  _id: { type: 'string', example: '507f1f77bcf86cd799439013' },
+                  name: { type: 'string', example: 'Áo thun nam' },
+                  images: { type: 'array', items: { type: 'string' } },
+                  price: { type: 'number', example: 500000 },
+                },
+              },
+              quantity: { type: 'number', example: 2 },
+              price: { type: 'number', example: 500000 },
+              variant: { type: 'string', example: 'Áo thun nam - Đỏ - M' },
+            },
+          },
+        },
+        vouchers: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              voucherId: {
+                type: 'string',
+                example: '68565473537f64f28418e85c',
+                description: 'ID của voucher',
+              },
+              type: {
+                type: 'string',
+                example: 'item',
+                enum: ['item', 'ship'],
+                description: 'Loại voucher',
+              },
+              disCount: {
+                type: 'number',
+                example: 10,
+                description: 'Phần trăm giảm giá (%) tại thời điểm tạo order',
+              },
+              condition: {
+                type: 'number',
+                example: 500000,
+                description: 'Điều kiện tối thiểu (VNĐ) tại thời điểm tạo order',
+              },
+              limit: {
+                type: 'number',
+                example: 100000,
+                description: 'Giới hạn giảm giá tối đa (VNĐ) tại thời điểm tạo order',
+              },
+              appliedDiscount: {
+                type: 'number',
+                example: 50000,
+                description: 'Số tiền giảm giá thực tế được áp dụng',
+              },
+            },
+          },
+          description: 'Snapshot thông tin voucher tại thời điểm tạo order',
+        },
+        subtotal: {
+          type: 'number',
+          example: 1000000,
+          description: 'Tổng tiền sản phẩm trước giảm giá',
+        },
+        itemDiscount: {
+          type: 'number',
+          example: 50000,
+          description: 'Tổng giảm giá cho sản phẩm',
+        },
+        shipDiscount: {
+          type: 'number',
+          example: 10000,
+          description: 'Tổng giảm giá cho vận chuyển',
+        },
+        total: {
+          type: 'number',
+          example: 940000,
+          description: 'Tổng tiền cuối cùng sau khi áp dụng voucher',
+        },
+        shipCost: {
+          type: 'number',
+          example: 0,
+          description: 'Phí vận chuyển (0 cho mua tại shop)',
+        },
+        status: { type: 'string', example: 'confirmed' },
+        paymentStatus: { type: 'string', example: 'paid' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Dữ liệu không hợp lệ, sản phẩm không tồn tại, không đủ tồn kho, hoặc voucher không hợp lệ',
+  })
+  async createOrderForGuest(
+    @Body() createOrderGuestDto: CreateOrderGuestDto,
+  ) {
+    return this.ordersService.createForGuest(createOrderGuestDto);
   }
 
   @UseGuards(AdminGuard)

@@ -2,15 +2,46 @@ import { Controller, Post, Get, Put, Body, Param, Res, HttpStatus } from '@nestj
 import { PayOSService } from '../services/payOS.service';
 import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger';
-import { CreatePaymentDto, CancelPaymentDto, ConfirmWebhookDto } from '../dtos/create-payment.dto';
+import { CreatePaymentDto, CancelPaymentDto, ConfirmWebhookDto, SimpleCreatePaymentDto } from '../dtos/create-payment.dto';
 
 @ApiTags('PayOS')
 @Controller('payos')
 export class PayOSController {
   constructor(private readonly payOSService: PayOSService) {}
 
+  @Post('create-simple-payment')
+  @ApiOperation({ summary: 'Tạo thanh toán đơn giản (chỉ cần productId và quantity)' })
+  @ApiBody({ type: SimpleCreatePaymentDto })
+  @ApiResponse({ status: 200, description: 'Trả về thông tin thanh toán.' })
+  @ApiResponse({ status: 500, description: 'Lỗi tạo thanh toán.' })
+  async createSimplePayment(@Body() body: SimpleCreatePaymentDto, @Res() res: Response) {
+    try {
+      const paymentData = await this.payOSService.createSimplePayment(body);
+      console.log('Simple payment data:', paymentData);
+      if (!paymentData) {
+        return res.status(HttpStatus.BAD_REQUEST).json({ 
+          error: -1,
+          message: 'Không tạo được thanh toán',
+          data: null 
+        });
+      }
+      return res.status(HttpStatus.OK).json({ 
+        error: 0,
+        message: 'Success',
+        data: paymentData
+      });
+    } catch (error) {
+      console.error('Controller error:', error);
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ 
+        error: -1,
+        message: 'Lỗi tạo thanh toán',
+        data: null 
+      });
+    }
+  }
+
   @Post('create-payment')
-  @ApiOperation({ summary: 'Tạo thanh toán PayOS' })
+  @ApiOperation({ summary: 'Tạo thanh toán PayOS (đầy đủ thông tin)' })
   @ApiBody({ type: CreatePaymentDto })
   @ApiResponse({ status: 200, description: 'Trả về thông tin thanh toán.' })
   @ApiResponse({ status: 500, description: 'Lỗi tạo thanh toán.' })
