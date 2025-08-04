@@ -112,4 +112,16 @@ export class UpdateItemStatusRequestDto {
     message: 'Status phải là một chuỗi'
   })
   status!: string;
+}
+
+export class UpdatePaymentStatusDto {
+  @ApiProperty({ 
+    description: 'Trạng thái thanh toán', 
+    enum: ['unpaid', 'paid', 'refunded'], 
+    example: 'paid' 
+  })
+  @IsEnum(['unpaid', 'paid', 'refunded'], {
+    message: 'Trạng thái thanh toán không hợp lệ'
+  })
+  paymentStatus: 'unpaid' | 'paid' | 'refunded';
 } 

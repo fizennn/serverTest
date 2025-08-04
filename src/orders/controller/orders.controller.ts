@@ -28,13 +28,8 @@ import {
   UpdateItemStatusDto,
   SimpleUpdateItemStatusDto,
   UpdateItemStatusRequestDto,
+  UpdatePaymentStatusDto,
 } from '../dtos/update-order.dto';
-import { ApiProperty } from '@nestjs/swagger';
-
-export class UpdatePaymentStatusDto {
-  @ApiProperty({ description: 'Trạng thái thanh toán', enum: ['unpaid', 'paid', 'refunded'], example: 'paid' })
-  paymentStatus: 'unpaid' | 'paid' | 'refunded';
-}
 
 @ApiTags('Đơn hàng')
 @Controller('orders')
@@ -658,6 +653,39 @@ export class OrdersController {
     @Body() body: UpdatePaymentStatusDto
   ) {
     return this.ordersService.updatePaymentStatus(id, body.paymentStatus);
+  }
+
+  @UseGuards(AdminGuard)
+  @Put('payment-status/:orderCode')
+  @ApiOperation({ 
+    summary: 'Cập nhật trạng thái thanh toán đơn hàng theo orderCode (Admin)',
+    description: 'Cập nhật trạng thái thanh toán của đơn hàng dựa trên orderCode thay vì ID'
+  })
+  @ApiParam({ 
+    name: 'orderCode', 
+    description: 'Mã đơn hàng (orderCode)',
+    example: 123456
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Cập nhật trạng thái thanh toán thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Cập nhật trạng thái thanh toán thành công' },
+        order: { type: 'object' }
+      }
+    }
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'Không tìm thấy đơn hàng với orderCode này' 
+  })
+  async updatePaymentStatusByOrderCode(
+    @Param('orderCode') orderCode: string,
+    @Body() body: UpdatePaymentStatusDto
+  ) {
+    return this.ordersService.updatePaymentStatusByOrderCode(parseInt(orderCode), body.paymentStatus);
   }
   @UseGuards(AdminGuard)
   @Delete(':id')

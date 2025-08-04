@@ -929,6 +929,33 @@ export class OrdersService {
     }
   }
 
+  async updatePaymentStatusByOrderCode(orderCode: number, paymentStatus: 'unpaid' | 'paid' | 'refunded') {
+    this.logger.log(`[UPDATE_PAYMENT_STATUS_BY_ORDER_CODE] Request received - OrderCode: ${orderCode}, PaymentStatus: ${paymentStatus}`);
+
+    try {
+      const order = await this.orderModel.findOne({ orderCode });
+      if (!order) {
+        this.logger.error(`[UPDATE_PAYMENT_STATUS_BY_ORDER_CODE] Order not found - OrderCode: ${orderCode}`);
+        throw new NotFoundException('Không tìm thấy đơn hàng với orderCode này');
+      }
+
+      this.logger.log(`[UPDATE_PAYMENT_STATUS_BY_ORDER_CODE] Order found - OrderId: ${order._id}, Current payment status: ${order.paymentStatus}`);
+
+      order.paymentStatus = paymentStatus;
+      await order.save();
+
+      this.logger.log(`[UPDATE_PAYMENT_STATUS_BY_ORDER_CODE] Success - OrderCode: ${orderCode}, New payment status: ${paymentStatus}`);
+      return { 
+        message: 'Cập nhật trạng thái thanh toán thành công', 
+        paymentStatus,
+        order 
+      };
+    } catch (error) {
+      this.logger.error(`[UPDATE_PAYMENT_STATUS_BY_ORDER_CODE] Error: ${error.message}`);
+      throw error;
+    }
+  }
+
   async findUserOrders(
     userId: string,
     page = 1,

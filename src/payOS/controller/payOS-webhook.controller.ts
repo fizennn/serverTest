@@ -13,17 +13,17 @@ export class PayOSWebhookController {
 
   @Post('payos')
   @ApiOperation({ summary: 'Webhook endpoint để nhận callback từ PayOS' })
-  @ApiBody({ type: PayOSWebhookDto })
   @ApiResponse({ status: 200, description: 'Webhook được xử lý thành công.' })
   async handlePayOSWebhook(
-    @Body() payload: any, // Thay đổi từ PayOSWebhookDto thành any để tránh validation error
-    @Headers('x-payos-signature') signature: string,
+    @Body() payload: any, // Sử dụng any để tránh validation error
+    @Headers('x-payos-signature') headerSignature: string,
     @Res() response: Response,
   ) {
     try {
       this.logger.log(`[WEBHOOK] Received PayOS webhook`);
       this.logger.log(`[WEBHOOK] Full payload: ${JSON.stringify(payload)}`);
-      this.logger.log(`[WEBHOOK] Signature: ${signature}`);
+      this.logger.log(`[WEBHOOK] Header signature: ${headerSignature}`);
+      this.logger.log(`[WEBHOOK] Payload signature: ${payload?.signature}`);
       this.logger.log(`[WEBHOOK] Payload type: ${typeof payload}`);
       this.logger.log(`[WEBHOOK] Payload keys: ${Object.keys(payload || {}).join(', ')}`);
 
@@ -31,6 +31,9 @@ export class PayOSWebhookController {
       this.logger.log(`[WEBHOOK] Sending 200 OK response immediately for PayOS compatibility`);
       response.status(HttpStatus.OK).json({ received: true });
 
+      // Sử dụng signature từ payload nếu có, nếu không thì từ header
+      const signature = payload?.signature || headerSignature;
+      
       // Verify webhook signature
       const isValid = this.payOSWebhookService.verifyWebhookSignature(payload, signature);
       
