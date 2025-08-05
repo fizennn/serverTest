@@ -19,7 +19,7 @@ export class Variant {
   @Prop({ required: true })
   color!: string;
 
-  @Prop({ required: true })
+  @Prop({ required: false, default: '' })
   image!: string;
 
   @Prop({ type: [SizeSchema], default: [] })

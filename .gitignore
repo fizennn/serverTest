@@ -3,7 +3,9 @@
 #seeds
 seeds
 *.http
-
+node_modules/
+package-lock.json
+yarn.lock
 # dependencies
 dist
 node_modules

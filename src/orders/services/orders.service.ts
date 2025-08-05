@@ -1293,4 +1293,25 @@ export class OrdersService {
       throw error;
     }
   }
+
+  async getOrderStatusCounts() {
+    const statuses = ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'];
+    const counts = {};
+
+    // Lấy số lượng đơn hàng cho từng trạng thái
+    const countPromises = statuses.map(async (status) => {
+      const count = await this.orderModel.countDocuments({ status });
+      counts[status] = count;
+    });
+
+    await Promise.all(countPromises);
+
+    // Tính tổng số đơn hàng
+    const total = Object.values(counts).reduce((sum: number, count: number) => sum + count, 0);
+
+    return {
+      ...counts,
+      total
+    };
+  }
 }

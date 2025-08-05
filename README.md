@@ -830,4 +830,267 @@ Các API để tạo và quản lý hệ thống mã giảm giá phức tạp, b
     }'
     ```
 
-</rewritten_file> 
+---
+
+### **8.7. Nhóm API Quản lý Đơn hoàn trả (Return Orders)**
+
+Các API để quản lý yêu cầu trả hàng của khách hàng và xử lý hoàn tiền.
+**Controller**: `src/return-orders/controllers/return-orders.controller.ts`
+
+#### **1. Lấy danh sách đơn hoàn trả của người dùng**
+
+-   **Endpoint**: `GET /return-orders/my-returns`
+-   **Mô tả**: Lấy danh sách tất cả yêu cầu trả hàng của khách hàng hiện tại với phân trang.
+-   **Authentication**: Yêu cầu JWT token
+-   **Query Parameters**:
+    -   `page` (optional): Số trang (mặc định: 1)
+    -   `limit` (optional): Số lượng item trên mỗi trang (mặc định: 10)
+-   **Response (200 OK)**:
+    ```json
+    {
+      "data": [
+        {
+          "_id": "68896ceb759ba2dbe04d791d",
+          "orderId": {
+            "_id": "68896b33759ba2dbe04d78f8",
+            "total": 249000,
+            "status": "delivered",
+            "createdAt": "2025-07-30T00:45:39.879Z"
+          },
+          "customerId": "6863350f47d3f75b09d8a49b",
+          "reason": "Sản phẩm không đúng mô tả",
+          "description": "Màu sắc khác với hình ảnh",
+          "items": [
+            {
+              "productId": {
+                "_id": "686b9328b25d1e23015d0441",
+                "name": "Áo thun nam cổ tròn Basic",
+                "images": ["https://example.com/image.jpg"]
+              },
+              "quantity": 1,
+              "unitPrice": 219000,
+              "totalPrice": 219000,
+              "variant": "Áo thun nam cổ tròn Basic - Đen - S"
+            }
+          ],
+          "totalRefundAmount": 219000,
+          "status": "pending",
+          "images": ["string"],
+          "createdAt": "2025-07-30T00:52:59.351Z",
+          "updatedAt": "2025-07-30T00:52:59.351Z"
+        }
+      ],
+      "total": 5,
+      "pages": 1
+    }
+    ```
+-   **Ví dụ cURL**:
+    ```bash
+    curl --location --request GET 'http://localhost:3000/api/return-orders/my-returns?page=1&limit=10' \
+    --header 'Authorization: Bearer your_access_token'
+    ```
+
+#### **2. Tạo yêu cầu trả hàng**
+
+-   **Endpoint**: `POST /return-orders/orders/:orderId/return`
+-   **Mô tả**: Khách hàng tạo yêu cầu trả hàng cho đơn hàng đã giao thành công. Chỉ có thể trả hàng trong vòng 7 ngày sau khi giao hàng thành công.
+-   **Authentication**: Yêu cầu JWT token
+-   **Path Parameters**:
+    -   `orderId`: ID đơn hàng cần trả
+-   **Request Body**:
+    ```json
+    {
+      "reason": "Sản phẩm không đúng mô tả",
+      "description": "Màu sắc khác với hình ảnh",
+      "items": [
+        {
+          "productId": "686b9328b25d1e23015d0441",
+          "quantity": 1
+        }
+      ],
+      "images": ["https://example.com/image.jpg"]
+    }
+    ```
+-   **Response (201 Created)**:
+    ```json
+    {
+      "_id": "68896ceb759ba2dbe04d791d",
+      "orderId": {
+        "_id": "68896b33759ba2dbe04d78f8",
+        "total": 249000,
+        "status": "delivered",
+        "createdAt": "2025-07-30T00:45:39.879Z"
+      },
+      "customerId": {
+        "_id": "6863350f47d3f75b09d8a49b",
+        "name": "Nguyen Van A",
+        "email": "test@example.com"
+      },
+      "reason": "Sản phẩm không đúng mô tả",
+      "description": "Màu sắc khác với hình ảnh",
+      "items": [
+        {
+          "productId": {
+            "_id": "686b9328b25d1e23015d0441",
+            "name": "Áo thun nam cổ tròn Basic",
+            "images": ["https://example.com/image.jpg"]
+          },
+          "quantity": 1,
+          "unitPrice": 219000,
+          "totalPrice": 219000,
+          "variant": "Áo thun nam cổ tròn Basic - Đen - S"
+        }
+      ],
+      "totalRefundAmount": 219000,
+      "status": "pending",
+      "images": ["https://example.com/image.jpg"],
+      "createdAt": "2025-07-30T00:52:59.351Z",
+      "updatedAt": "2025-07-30T00:52:59.351Z"
+    }
+    ```
+-   **Ví dụ cURL**:
+    ```bash
+    curl --location --request POST 'http://localhost:3000/api/return-orders/orders/68896b33759ba2dbe04d78f8/return' \
+    --header 'Authorization: Bearer your_access_token' \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+        "reason": "Sản phẩm không đúng mô tả",
+        "description": "Màu sắc khác với hình ảnh",
+        "items": [
+            {
+                "productId": "686b9328b25d1e23015d0441",
+                "quantity": 1
+            }
+        ],
+        "images": ["https://example.com/image.jpg"]
+    }'
+    ```
+
+#### **3. Lấy thông tin yêu cầu trả hàng theo orderId**
+
+-   **Endpoint**: `GET /return-orders/orders/:orderId/return`
+-   **Mô tả**: Lấy thông tin yêu cầu trả hàng của đơn hàng.
+-   **Authentication**: Yêu cầu JWT token
+-   **Path Parameters**:
+    -   `orderId`: ID đơn hàng
+-   **Response (200 OK)**: Tương tự như response của tạo yêu cầu trả hàng
+-   **Ví dụ cURL**:
+    ```bash
+    curl --location --request GET 'http://localhost:3000/api/return-orders/orders/68896b33759ba2dbe04d78f8/return' \
+    --header 'Authorization: Bearer your_access_token'
+    ```
+
+#### **4. Lấy thông tin yêu cầu trả hàng theo ID**
+
+-   **Endpoint**: `GET /return-orders/get/:id`
+-   **Mô tả**: Lấy chi tiết yêu cầu trả hàng theo ID.
+-   **Authentication**: Yêu cầu JWT token
+-   **Path Parameters**:
+    -   `id`: ID yêu cầu trả hàng
+-   **Response (200 OK)**: Tương tự như response của tạo yêu cầu trả hàng
+-   **Ví dụ cURL**:
+    ```bash
+    curl --location --request GET 'http://localhost:3000/api/return-orders/get/68896ceb759ba2dbe04d791d' \
+    --header 'Authorization: Bearer your_access_token'
+    ```
+
+#### **5. Lấy tất cả yêu cầu trả hàng (Admin)**
+
+-   **Endpoint**: `GET /return-orders`
+-   **Mô tả**: Admin lấy tất cả yêu cầu trả hàng trong hệ thống với phân trang và lọc theo trạng thái.
+-   **Authentication**: Yêu cầu Admin token
+-   **Query Parameters**:
+    -   `page` (optional): Số trang (mặc định: 1)
+    -   `limit` (optional): Số lượng item trên mỗi trang (mặc định: 10)
+    -   `status` (optional): Lọc theo trạng thái (`pending`, `approved`, `rejected`, `processing`, `completed`)
+-   **Response (200 OK)**: Tương tự như response của lấy danh sách đơn hoàn trả của người dùng
+-   **Ví dụ cURL**:
+    ```bash
+    curl --location --request GET 'http://localhost:3000/api/return-orders?page=1&limit=10&status=pending' \
+    --header 'Authorization: Bearer your_admin_access_token'
+    ```
+
+#### **6. Cập nhật trạng thái yêu cầu trả hàng (Admin)**
+
+-   **Endpoint**: `PUT /return-orders/:id/status`
+-   **Mô tả**: Admin cập nhật trạng thái yêu cầu trả hàng và xử lý hoàn tiền.
+-   **Authentication**: Yêu cầu Admin token
+-   **Path Parameters**:
+    -   `id`: ID yêu cầu trả hàng
+-   **Request Body**:
+    ```json
+    {
+      "status": "approved",
+      "adminNote": "Đã kiểm tra và chấp nhận yêu cầu trả hàng"
+    }
+    ```
+-   **Response (200 OK)**: Tương tự như response của tạo yêu cầu trả hàng
+-   **Ví dụ cURL**:
+    ```bash
+    curl --location --request PUT 'http://localhost:3000/api/return-orders/68896ceb759ba2dbe04d791d/status' \
+    --header 'Authorization: Bearer your_admin_access_token' \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+        "status": "approved",
+        "adminNote": "Đã kiểm tra và chấp nhận yêu cầu trả hàng"
+    }'
+    ```
+
+#### **7. Xóa yêu cầu trả hàng**
+
+-   **Endpoint**: `DELETE /return-orders/:id`
+-   **Mô tả**: Xóa yêu cầu trả hàng. Chỉ có thể xóa yêu cầu đang chờ xử lý.
+-   **Authentication**: Yêu cầu JWT token
+-   **Path Parameters**:
+    -   `id`: ID yêu cầu trả hàng
+-   **Response (200 OK)**:
+    ```json
+    {
+      "success": true
+    }
+    ```
+-   **Ví dụ cURL**:
+    ```bash
+    curl --location --request DELETE 'http://localhost:3000/api/return-orders/68896ceb759ba2dbe04d791d' \
+    --header 'Authorization: Bearer your_access_token'
+    ```
+
+#### **8. Thống kê đơn hoàn trả (Admin)**
+
+-   **Endpoint**: `GET /return-orders/statistics`
+-   **Mô tả**: Lấy thống kê về đơn hoàn trả theo trạng thái và tổng hợp.
+-   **Authentication**: Yêu cầu Admin token
+-   **Query Parameters**:
+    -   `startDate` (optional): Ngày bắt đầu (format: YYYY-MM-DD)
+    -   `endDate` (optional): Ngày kết thúc (format: YYYY-MM-DD)
+-   **Response (200 OK)**:
+    ```json
+    {
+      "statusStats": [
+        {
+          "_id": "pending",
+          "count": 10,
+          "totalRefundAmount": 2190000
+        },
+        {
+          "_id": "approved",
+          "count": 5,
+          "totalRefundAmount": 1095000
+        }
+      ],
+      "totalStats": {
+        "totalReturns": 15,
+        "totalRefundAmount": 3285000,
+        "averageRefundAmount": 219000
+      }
+    }
+    ```
+-   **Ví dụ cURL**:
+    ```bash
+    curl --location --request GET 'http://localhost:3000/api/return-orders/statistics?startDate=2025-07-01&endDate=2025-07-31' \
+    --header 'Authorization: Bearer your_admin_access_token'
+    ```
+
+---
+
+## **9. Cài đặt và Chạy Dự án** 

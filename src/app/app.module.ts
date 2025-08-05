@@ -21,6 +21,8 @@ import { AnalyticsModule } from '@/analytics/analytics.module';
 import { ChatbotModule } from '../chatbot/chatbot.module';
 import { PayOSModule } from '../payOS/payOS.module';
 import { ReturnOrdersModule } from '@/return-orders/return-orders.module';
+import { NotificationModule } from '@/notifications/notifications.module';
+
 import { StripeModule } from '../stripe/stripe.module';
 import { PermissionGuard } from '../guards/permission.guard';
 
@@ -51,7 +53,8 @@ import { PermissionGuard } from '../guards/permission.guard';
     ChatbotModule,
     PayOSModule,
     ReturnOrdersModule,
-    StripeModule
+    StripeModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService, PermissionGuard],

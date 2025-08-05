@@ -34,18 +34,28 @@ export class AuthService {
 
   async login(user: UserDocument): Promise<AuthResponseDto> {
     // Populate role trước khi tạo tokens
-    const userWithRole = await this.userModel.findById(user._id).populate('roleId');
-    
+    const userWithRole = await this.userModel
+      .findById(user._id)
+      .populate('roleId');
+    if (user.deviceId) {
+      await this.userModel.findByIdAndUpdate(user._id, {
+        deviceId: user.deviceId,
+      });
+    }
     const tokens = await this.generateTokens(userWithRole);
-    
+
     // Populate vouchers data - lấy tất cả voucher mà user có quyền sử dụng
     let userVouchers = [];
     try {
       // Lấy tất cả voucher mà user có quyền sử dụng (user ID có trong userId array của voucher)
-      const vouchers = await this.vouchersService.findVouchersByUserId(user._id.toString());
+      const vouchers = await this.vouchersService.findVouchersByUserId(
+        user._id.toString(),
+      );
       userVouchers = vouchers; // Không filter isDisable nữa, lấy tất cả voucher của user
-      
-      console.log(`Successfully fetched ${userVouchers.length} vouchers for user ${user.email}`);
+
+      console.log(
+        `Successfully fetched ${userVouchers.length} vouchers for user ${user.email}`,
+      );
     } catch (error) {
       console.error('Error fetching vouchers:', error);
       userVouchers = []; // Đảm bảo trả về array rỗng nếu có lỗi

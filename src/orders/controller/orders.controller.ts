@@ -888,4 +888,29 @@ export class OrdersController {
   async checkPaymentStatus(@Param('id') id: string) {
     return this.ordersService.checkPaymentStatus(id);
   }
+
+  @UseGuards(AdminGuard)
+  @Get('stats/status-counts')
+  @ApiOperation({
+    summary: 'Lấy tổng số đơn hàng theo từng trạng thái (Admin)',
+    description: 'Lấy thống kê tổng số đơn hàng theo từng trạng thái: pending, confirmed, shipping, delivered, cancelled',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Thống kê đơn hàng theo trạng thái',
+    schema: {
+      type: 'object',
+      properties: {
+        pending: { type: 'number', example: 15, description: 'Số đơn hàng đang chờ xử lý' },
+        confirmed: { type: 'number', example: 8, description: 'Số đơn hàng đã xác nhận' },
+        shipping: { type: 'number', example: 12, description: 'Số đơn hàng đang vận chuyển' },
+        delivered: { type: 'number', example: 45, description: 'Số đơn hàng đã giao thành công' },
+        cancelled: { type: 'number', example: 3, description: 'Số đơn hàng đã hủy' },
+        total: { type: 'number', example: 83, description: 'Tổng số đơn hàng' }
+      }
+    }
+  })
+  async getOrderStatusCounts() {
+    return this.ordersService.getOrderStatusCounts();
+  }
 }

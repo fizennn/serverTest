@@ -199,18 +199,30 @@ export class ProductsService {
   async createMany(products: Partial<Product>[]): Promise<ProductDocument[]> {
     // Xử lý từng sản phẩm để tính averagePrice và countInStock
     const processedProducts = products.map(productData => {
+      // Đảm bảo variants là array hợp lệ và xử lý image
+      const variants = productData.variants && Array.isArray(productData.variants) 
+        ? productData.variants.map(variant => ({
+            ...variant,
+            image: variant.image || '', // Đảm bảo image luôn có giá trị
+            sizes: variant.sizes && Array.isArray(variant.sizes) ? variant.sizes : []
+          }))
+        : [];
+      
       // Tính toán giá trung bình nếu có variants hoặc sử dụng giá được gửi lên
       let averagePrice = productData.averagePrice || '0 - 0';
-      if (!productData.averagePrice && productData.variants && productData.variants.length > 0) {
-        averagePrice = this.calculateAveragePrice(productData.variants);
+      if (!productData.averagePrice && variants.length > 0) {
+        averagePrice = this.calculateAveragePrice(variants);
       }
+      
       // Tính toán tổng số lượng tồn kho từ các biến thể
       let countInStock = productData.countInStock || 0;
-      if (productData.variants && productData.variants.length > 0) {
-        countInStock = this.calculateTotalStock(productData.variants);
+      if (variants.length > 0) {
+        countInStock = this.calculateTotalStock(variants);
       }
+      
       return {
         ...productData,
+        variants,
         averagePrice,
         countInStock,
         rating: 0,
@@ -239,21 +251,36 @@ export class ProductsService {
     if (!product) throw new NotFoundException('No product with given ID.');
 
     product.name = name ?? product.name;
-    product.averagePrice = averagePrice ?? product.averagePrice;
     product.description = description ?? product.description;
     product.images = images ?? product.images;
     product.brand = brand ?? product.brand;
     product.category = category ?? product.category;
-    product.variants = attrs.variants ?? product.variants;
     product.status = attrs.status ?? product.status;
 
-    // Tính toán lại giá trung bình và tồn kho nếu có variants
-    if (attrs.variants && attrs.variants.length > 0) {
-      product.averagePrice = this.calculateAveragePrice(attrs.variants);
-      product.countInStock = this.calculateTotalStock(attrs.variants);
+    // Xử lý variants và tính toán lại giá trung bình
+    if (attrs.variants !== undefined) {
+      // Đảm bảo variants là array hợp lệ và xử lý image
+      const variants = Array.isArray(attrs.variants) 
+        ? attrs.variants.map(variant => ({
+            ...variant,
+            image: variant.image || '', // Đảm bảo image luôn có giá trị
+            sizes: variant.sizes && Array.isArray(variant.sizes) ? variant.sizes : []
+          }))
+        : [];
+      product.variants = variants;
+      
+      // Tính toán lại giá trung bình và tồn kho
+      if (variants.length > 0) {
+        product.averagePrice = this.calculateAveragePrice(variants);
+        product.countInStock = this.calculateTotalStock(variants);
+      } else {
+        // Nếu không có variants, set giá mặc định
+        product.averagePrice = '0 - 0';
+        product.countInStock = 0;
+      }
     } else {
-      // Nếu không có variants, có thể set mặc định hoặc giữ nguyên
-      // Ở đây, ta giữ nguyên giá trị cũ nếu không có variant mới
+      // Nếu không có variants mới, giữ nguyên giá trị cũ
+      product.averagePrice = averagePrice ?? product.averagePrice;
       product.countInStock = attrs.countInStock ?? product.countInStock;
     }
 
@@ -341,8 +368,18 @@ export class ProductsService {
       countInStock = this.calculateTotalStock(productData.variants);
     }
 
+    // Đảm bảo variants là array hợp lệ và xử lý image
+    const variants = productData.variants && Array.isArray(productData.variants) 
+      ? productData.variants.map(variant => ({
+          ...variant,
+          image: variant.image || '', // Đảm bảo image luôn có giá trị
+          sizes: variant.sizes && Array.isArray(variant.sizes) ? variant.sizes : []
+        }))
+      : [];
+
     const product = await this.productModel.create({
       ...productData,
+      variants,
       averagePrice,
       countInStock,
       rating: 0,
@@ -409,20 +446,47 @@ export class ProductsService {
    * @returns Chuỗi giá theo định dạng "giá thấp nhất - giá cao nhất"
    */
   private calculateAveragePrice(variants: any[]): string {
-    const allPrices = variants.flatMap(variant => variant.sizes.map(size => size.price));
+    // Lấy tất cả giá từ tất cả sizes của tất cả variants
+    const allPrices = variants.flatMap(variant => 
+      variant.sizes ? variant.sizes.map(size => size.price || 0) : []
+    );
+    
+    // Kiểm tra nếu không có giá nào
     if (allPrices.length === 0) {
       return '0 - 0';
     }
+    
+    // Lọc bỏ các giá 0 hoặc undefined
+    const validPrices = allPrices.filter(price => price > 0);
+    
+    if (validPrices.length === 0) {
+      return '0 - 0';
+    }
 
-    const minPrice = Math.min(...allPrices);
-    const maxPrice = Math.max(...allPrices);
+    const minPrice = Math.min(...validPrices);
+    const maxPrice = Math.max(...validPrices);
+
+    // Nếu chỉ có 1 giá duy nhất, hiển thị cùng giá cho min và max
+    if (minPrice === maxPrice) {
+      return `${minPrice} - ${maxPrice}`;
+    }
 
     return `${minPrice} - ${maxPrice}`;
   }
 
   private calculateTotalStock(variants: any[]): number {
     return variants.reduce((totalStock, variant) => {
-      const variantStock = variant.sizes.reduce((acc, size) => acc + (size.stock || 0), 0);
+      // Kiểm tra nếu variant có sizes
+      if (!variant.sizes || !Array.isArray(variant.sizes)) {
+        return totalStock;
+      }
+      
+      const variantStock = variant.sizes.reduce((acc, size) => {
+        // Kiểm tra nếu size có stock và là số hợp lệ
+        const stockValue = size.stock || 0;
+        return acc + (typeof stockValue === 'number' && stockValue >= 0 ? stockValue : 0);
+      }, 0);
+      
       return totalStock + variantStock;
     }, 0);
   }
