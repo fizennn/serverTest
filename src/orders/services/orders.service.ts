@@ -18,6 +18,7 @@ import { Voucher } from '../../vouchers/schemas/voucher.schema';
 import { ProductsService } from '../../products/services/products.service';
 import { VouchersService } from '../../vouchers/services/vouchers.service';
 import { PayOSService } from '../../payOS/services/payOS.service';
+import { AdvancedSearchOrderDto, PaginatedSearchOrderResponseDto, SortField, SortOrder } from '../dtos/search-order.dto';
 
 @Injectable()
 export class OrdersService {
@@ -1312,6 +1313,175 @@ export class OrdersService {
     return {
       ...counts,
       total
+    };
+  }
+
+  async advancedSearch(
+    searchDto: AdvancedSearchOrderDto,
+  ): Promise<PaginatedSearchOrderResponseDto> {
+    const {
+      keyword,
+      status,
+      statuses,
+      paymentStatus,
+      startDate,
+      endDate,
+      minTotal,
+      maxTotal,
+      payment,
+      atStore,
+      sortBy = SortField.CREATED_AT,
+      sortOrder = SortOrder.DESC,
+      page = 1,
+      limit = 10,
+    } = searchDto;
+
+    const skip = (page - 1) * limit;
+    const query: any = {};
+
+    // Tìm kiếm theo từ khóa (mã đơn hàng, tên khách hàng)
+    if (keyword) {
+      const keywordRegex = new RegExp(keyword, 'i');
+      query.$or = [
+        { orderCode: { $regex: keywordRegex } },
+        { 'idUser.name': { $regex: keywordRegex } },
+        { 'idUser.email': { $regex: keywordRegex } },
+      ];
+    }
+
+    // Tìm kiếm theo trạng thái đơn hàng
+    if (status) {
+      query.status = status;
+    } else if (statuses && statuses.length > 0) {
+      query.status = { $in: statuses };
+    }
+
+    // Tìm kiếm theo trạng thái thanh toán
+    if (paymentStatus) {
+      query.paymentStatus = paymentStatus;
+    }
+
+    // Tìm kiếm theo khoảng thời gian
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) {
+        query.createdAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        query.createdAt.$lte = new Date(endDate);
+      }
+    }
+
+    // Tìm kiếm theo khoảng giá
+    if (minTotal || maxTotal) {
+      query.total = {};
+      if (minTotal !== undefined) {
+        query.total.$gte = minTotal;
+      }
+      if (maxTotal !== undefined) {
+        query.total.$lte = maxTotal;
+      }
+    }
+
+    // Tìm kiếm theo phương thức thanh toán
+    if (payment) {
+      query.payment = payment;
+    }
+
+    // Tìm kiếm theo mua tại cửa hàng
+    if (atStore !== undefined) {
+      query.atStore = atStore;
+    }
+
+    // Xây dựng sort object
+    let sortObject: any = {};
+    if (sortBy === SortField.CUSTOMER_NAME) {
+      sortObject['idUser.name'] = sortOrder === SortOrder.ASC ? 1 : -1;
+    } else {
+      sortObject[sortBy] = sortOrder === SortOrder.ASC ? 1 : -1;
+    }
+
+    // Thực hiện query với populate
+    const [data, total] = await Promise.all([
+      this.orderModel
+        .find(query)
+        .populate('idUser', 'name email')
+        .populate('items.product', 'name images price')
+        .sort(sortObject)
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.orderModel.countDocuments(query),
+    ]);
+
+    return {
+      data: data as any,
+      total,
+      pages: Math.ceil(total / limit),
+      currentPage: page,
+      limit,
+    };
+  }
+
+  async getSearchStats(
+    status?: string,
+    paymentStatus?: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
+    const query: any = {};
+
+    if (status) {
+      query.status = status;
+    }
+    if (paymentStatus) {
+      query.paymentStatus = paymentStatus;
+    }
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) {
+        query.createdAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        query.createdAt.$lte = new Date(endDate);
+      }
+    }
+
+    const [totalOrders, totalAmount, statusBreakdown, paymentBreakdown] = await Promise.all([
+      this.orderModel.countDocuments(query),
+      this.orderModel.aggregate([
+        { $match: query },
+        { $group: { _id: null, total: { $sum: '$total' } } }
+      ]),
+      this.orderModel.aggregate([
+        { $match: query },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+      ]),
+      this.orderModel.aggregate([
+        { $match: query },
+        { $group: { _id: '$paymentStatus', count: { $sum: 1 } } }
+      ])
+    ]);
+
+    const totalAmountValue = totalAmount.length > 0 ? totalAmount[0].total : 0;
+    const averageOrderValue = totalOrders > 0 ? totalAmountValue / totalOrders : 0;
+
+    const statusBreakdownObj = statusBreakdown.reduce((acc, item) => {
+      acc[item._id] = item.count;
+      return acc;
+    }, {});
+
+    const paymentBreakdownObj = paymentBreakdown.reduce((acc, item) => {
+      acc[item._id] = item.count;
+      return acc;
+    }, {});
+
+    return {
+      totalOrders,
+      totalAmount: totalAmountValue,
+      averageOrderValue: Math.round(averageOrderValue),
+      statusBreakdown: statusBreakdownObj,
+      paymentBreakdown: paymentBreakdownObj,
     };
   }
 }

@@ -14,11 +14,11 @@ export class UpdateOrderDto {
   @ApiProperty({
     description: 'Phương thức thanh toán',
     example: 'COD',
-    enum: ['COD', 'payOS'],
+    enum: ['COD', 'payOS', 'GOOGLE_PAY'],
     required: false,
   })
   @IsOptional()
-  @IsEnum(['COD', 'payOS'])
+  @IsEnum(['COD', 'payOS', 'GOOGLE_PAY'])
   payment?: string;
 
   @ApiProperty({

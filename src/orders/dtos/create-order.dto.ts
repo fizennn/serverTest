@@ -62,10 +62,11 @@ export class CreateOrderDto {
   @ApiProperty({
     description: 'Phương thức thanh toán',
     example: 'COD',
+    enum: ['COD', 'payOS', 'GOOGLE_PAY'],
     required: false,
   })
   @IsOptional()
-  @IsString()
+  @IsEnum(['COD', 'payOS', 'GOOGLE_PAY'])
   payment?: string;
 
   @ApiProperty({
@@ -157,10 +158,11 @@ export class CreateOrderAdminDto {
   @ApiProperty({
     description: 'Phương thức thanh toán',
     example: 'COD',
+    enum: ['COD', 'payOS', 'GOOGLE_PAY'],
     required: false,
   })
   @IsOptional()
-  @IsString()
+  @IsEnum(['COD', 'payOS', 'GOOGLE_PAY'])
   payment?: string;
 
   @ApiProperty({
@@ -263,10 +265,11 @@ export class CreateOrderGuestDto {
   @ApiProperty({
     description: 'Phương thức thanh toán',
     example: 'COD',
+    enum: ['COD', 'payOS', 'GOOGLE_PAY'],
     required: false,
   })
   @IsOptional()
-  @IsString()
+  @IsEnum(['COD', 'payOS', 'GOOGLE_PAY'])
   payment?: string;
 
   @ApiProperty({

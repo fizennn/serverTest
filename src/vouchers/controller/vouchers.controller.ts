@@ -8,17 +8,24 @@ import {
   Delete,
   UseGuards,
   Query,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { VouchersService } from '../services/vouchers.service';
 import { CreateVoucherDto, UpdateVoucherDto, VoucherResponseDto, PaginatedVoucherResponseDto, CheckVoucherDto, CalculateMultipleVouchersDto } from '../dtos/voucher.dto';
 import { JwtAuthGuard } from '@/guards/jwt-auth.guard';
 import { AdminGuard } from '@/guards/admin.guard';
+import { UsersService } from '@/users/services/users.service';
 
 @ApiTags('Voucher - Hệ thống giảm giá')
 @Controller('vouchers')
 export class VouchersController {
-  constructor(private readonly vouchersService: VouchersService) {}
+  constructor(
+    private readonly vouchersService: VouchersService,
+    @Inject(forwardRef(() => UsersService))
+    private readonly usersService: UsersService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -114,6 +121,34 @@ export class VouchersController {
     @Param('voucherId') voucherId: string
   ) {
     return this.vouchersService.removeVoucherFromUser(voucherId, userId);
+  }
+
+  @Delete('user/:userId/remove-voucher/:voucherId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'User tự xóa voucher khỏi danh sách voucher của mình',
+    description: 'User tự xóa voucher đã nhận khỏi danh sách voucher của mình. Voucher sẽ được trả lại stock và user không thể sử dụng voucher này nữa.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Xóa voucher khỏi user thành công',
+    type: VoucherResponseDto
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'Voucher ID hoặc User ID không hợp lệ, hoặc user không có quyền sử dụng voucher này' 
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'Voucher không tồn tại' 
+  })
+  userRemoveVoucher(
+    @Param('userId') userId: string,
+    @Param('voucherId') voucherId: string
+  ) {
+    // Sử dụng users service để xóa voucher khỏi user
+    return this.usersService.removeVoucherFromUser(userId, voucherId, this.vouchersService);
   }
 
   @Get(':id')

@@ -30,6 +30,7 @@ import {
   UpdateItemStatusRequestDto,
   UpdatePaymentStatusDto,
 } from '../dtos/update-order.dto';
+import { AdvancedSearchOrderDto, PaginatedSearchOrderResponseDto } from '../dtos/search-order.dto';
 
 @ApiTags('Đơn hàng')
 @Controller('orders')
@@ -461,9 +462,85 @@ export class OrdersController {
   @UseGuards(AdminGuard)
   @Get()
   @ApiOperation({
-    summary: 'Lấy tất cả đơn hàng (Admin)',
-    description:
-      'Lấy danh sách tất cả đơn hàng có phân trang. Sắp xếp theo thời gian tạo mới nhất.',
+    summary: 'Tìm kiếm đơn hàng nâng cao (Admin)',
+    description: 'Tìm kiếm đơn hàng với nhiều tiêu chí: từ khóa, trạng thái, khoảng thời gian, khoảng giá, sắp xếp...',
+  })
+  @ApiQuery({
+    name: 'keyword',
+    required: false,
+    description: 'Từ khóa tìm kiếm (mã đơn hàng, tên khách hàng)',
+    example: 'ORD123456',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Trạng thái đơn hàng',
+    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'],
+    example: 'pending',
+  })
+  @ApiQuery({
+    name: 'statuses',
+    required: false,
+    description: 'Danh sách trạng thái đơn hàng (cho phép tìm kiếm nhiều trạng thái)',
+    type: [String],
+    example: ['pending', 'confirmed'],
+  })
+  @ApiQuery({
+    name: 'paymentStatus',
+    required: false,
+    description: 'Trạng thái thanh toán',
+    enum: ['unpaid', 'paid', 'refunded', 'cancelled', 'expired', 'failed', 'pending'],
+    example: 'paid',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Ngày bắt đầu (ISO string)',
+    example: '2024-01-01T00:00:00.000Z',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Ngày kết thúc (ISO string)',
+    example: '2024-12-31T23:59:59.999Z',
+  })
+  @ApiQuery({
+    name: 'minTotal',
+    required: false,
+    description: 'Tổng tiền tối thiểu',
+    example: 100000,
+  })
+  @ApiQuery({
+    name: 'maxTotal',
+    required: false,
+    description: 'Tổng tiền tối đa',
+    example: 1000000,
+  })
+  @ApiQuery({
+    name: 'payment',
+    required: false,
+    description: 'Phương thức thanh toán',
+    enum: ['COD', 'payOS', 'GOOGLE_PAY'],
+    example: 'COD',
+  })
+  @ApiQuery({
+    name: 'atStore',
+    required: false,
+    description: 'Mua tại cửa hàng',
+    example: false,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    description: 'Trường sắp xếp',
+    enum: ['createdAt', 'total', 'status', 'customerName'],
+    example: 'createdAt',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Số lượng item trên mỗi trang',
+    example: 10,
   })
   @ApiQuery({
     name: 'page',
@@ -472,21 +549,19 @@ export class OrdersController {
     example: 1,
   })
   @ApiQuery({
-    name: 'limit',
+    name: 'sortOrder',
     required: false,
-    description: 'Số lượng item trên mỗi trang',
-    example: 10,
+    description: 'Thứ tự sắp xếp',
+    enum: ['asc', 'desc'],
+    example: 'desc',
   })
   @ApiResponse({
     status: 200,
-    description: 'Danh sách đơn hàng có phân trang',
-    type: PaginatedOrderResponseDto,
+    description: 'Kết quả tìm kiếm đơn hàng',
+    type: PaginatedSearchOrderResponseDto,
   })
-  async getOrders(
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-  ) {
-    return this.ordersService.findAll(page, limit);
+  async searchOrders(@Query() searchDto: AdvancedSearchOrderDto) {
+    return this.ordersService.advancedSearch(searchDto);
   }
 
   @UseGuards(AdminGuard)
@@ -912,5 +987,75 @@ export class OrdersController {
   })
   async getOrderStatusCounts() {
     return this.ordersService.getOrderStatusCounts();
+  }
+
+
+  @UseGuards(AdminGuard)
+  @Get('stats')
+  @ApiOperation({
+    summary: 'Thống kê đơn hàng (Admin)',
+    description: 'Lấy thống kê số lượng đơn hàng theo các tiêu chí tìm kiếm',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Trạng thái đơn hàng',
+    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'],
+  })
+  @ApiQuery({
+    name: 'paymentStatus',
+    required: false,
+    description: 'Trạng thái thanh toán',
+    enum: ['unpaid', 'paid', 'refunded', 'cancelled', 'expired', 'failed', 'pending'],
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Ngày bắt đầu (ISO string)',
+    example: '2024-01-01T00:00:00.000Z',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Ngày kết thúc (ISO string)',
+    example: '2024-12-31T23:59:59.999Z',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Thống kê đơn hàng',
+    schema: {
+      type: 'object',
+      properties: {
+        totalOrders: { type: 'number', example: 150 },
+        totalAmount: { type: 'number', example: 15000000 },
+        averageOrderValue: { type: 'number', example: 100000 },
+        statusBreakdown: {
+          type: 'object',
+          properties: {
+            pending: { type: 'number', example: 15 },
+            confirmed: { type: 'number', example: 8 },
+            shipping: { type: 'number', example: 12 },
+            delivered: { type: 'number', example: 45 },
+            cancelled: { type: 'number', example: 3 },
+          },
+        },
+        paymentBreakdown: {
+          type: 'object',
+          properties: {
+            unpaid: { type: 'number', example: 20 },
+            paid: { type: 'number', example: 100 },
+            refunded: { type: 'number', example: 5 },
+          },
+        },
+      },
+    },
+  })
+  async getSearchStats(
+    @Query('status') status?: string,
+    @Query('paymentStatus') paymentStatus?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.ordersService.getSearchStats(status, paymentStatus, startDate, endDate);
   }
 }

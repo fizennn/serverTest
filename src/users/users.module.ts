@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthController } from './controller/auth.controller';
 import { User, UserSchema } from './schemas/user.schema';
@@ -39,7 +39,7 @@ import { ProductsModule } from '../products/products.module';
       signOptions: { expiresIn: '1y' },
     }),
     MailModule,
-    VouchersModule,
+    forwardRef(() => VouchersModule),
     ProductsModule,
   ],
   controllers: [AuthController, UsersController, RoleController],

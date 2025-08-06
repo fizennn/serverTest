@@ -256,6 +256,37 @@ export class UsersService {
     return user;
   }
 
+  async removeVoucherFromUser(
+    userId: string,
+    voucherId: string,
+    vouchersService: any,
+  ): Promise<UserDocument> {
+    if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(voucherId)) {
+      throw new BadRequestException('ID không hợp lệ');
+    }
+
+    // Tìm và cập nhật user bằng $pull để xóa voucher khỏi mảng
+    const user = await this.userModel.findByIdAndUpdate(
+      userId,
+      { $pull: { vouchers: voucherId } }, // Sử dụng $pull để xóa voucherId khỏi mảng vouchers
+      { new: true } // Trả về document đã được cập nhật
+    );
+
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy user');
+    }
+
+    // Thử xóa user khỏi voucher (có thể user đã bị xóa khỏi voucher rồi)
+    try {
+      await vouchersService.removeUserFromVoucher(voucherId, userId);
+    } catch (error) {
+      // Log lỗi nhưng không dừng lại, vì mục tiêu chính là xóa voucher khỏi user
+      console.warn(`Could not remove user from voucher ${voucherId} in voucher collection: ${error.message}`);
+    }
+    
+    return user;
+  }
+
   async addFavoriteProduct(userId: string, productId: string): Promise<UserDocument> {
     if (!Types.ObjectId.isValid(userId)) {
       throw new BadRequestException('Invalid user ID');

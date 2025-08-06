@@ -417,6 +417,35 @@ export class UsersController {
     );
   }
 
+  @Delete(':userId/remove-voucher/:voucherId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ 
+    summary: 'User tự xóa voucher khỏi danh sách voucher của mình',
+    description: 'User tự xóa voucher đã nhận khỏi danh sách voucher của mình. Voucher sẽ được trả lại stock và user không thể sử dụng voucher này nữa.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Xóa voucher khỏi user thành công'
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'Voucher ID hoặc User ID không hợp lệ, hoặc user không có quyền sử dụng voucher này' 
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'Voucher không tồn tại' 
+  })
+  async removeVoucherFromUser(
+    @Param('userId') userId: string,
+    @Param('voucherId') voucherId: string,
+  ) {
+    return this.usersService.removeVoucherFromUser(
+      userId,
+      voucherId,
+      this.vouchersService,
+    );
+  }
+
   @Post(':userId/favorite-products')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Thêm sản phẩm yêu thích cho user' })
