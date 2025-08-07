@@ -68,6 +68,38 @@ export class AnalyticsService {
       },
     ]);
 
+    // Thống kê theo từng trạng thái
+    const statusStats = await this.orderModel.aggregate([
+      { $match: matchCondition },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // Chuyển đổi thành object
+    const orderStatusStats = {
+      pending: 0,
+      confirmed: 0,
+      shipping: 0,
+      delivered: 0,
+      cancelled: 0,
+      'return-pending': 0,
+      'return-approved': 0,
+      'return-processing': 0,
+      'return-completed': 0,
+      'return-rejected': 0,
+    };
+
+    statusStats.forEach(stat => {
+      if (orderStatusStats.hasOwnProperty(stat._id)) {
+        orderStatusStats[stat._id] = stat.count;
+      }
+    });
+
     if (!overviewStats) {
       return {
         totalOrders: 0,
@@ -76,6 +108,7 @@ export class AnalyticsService {
         totalProductsSold: 0,
         totalRevenue: 0,
         successRate: 0,
+        orderStatusStats,
       };
     }
 
@@ -87,6 +120,7 @@ export class AnalyticsService {
     return {
       ...overviewStats,
       successRate: Math.round(successRate * 100) / 100,
+      orderStatusStats,
     };
   }
 

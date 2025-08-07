@@ -116,8 +116,8 @@ export class SizeIdDto {
 
 export class ProductSearchDto {
   @ApiProperty({
-    description: 'Từ khóa tìm kiếm (tên, mô tả, brand, category)',
-    example: 'áo thun',
+    description: 'Từ khóa tìm kiếm (tên, mô tả, brand, category) hoặc ID sản phẩm (ObjectId)',
+    example: 'áo thun hoặc 507f1f77bcf86cd799439011',
     required: false,
   })
   @IsOptional()

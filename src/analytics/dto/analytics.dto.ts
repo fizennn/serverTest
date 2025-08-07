@@ -40,6 +40,34 @@ export class OrderOverviewDto {
 
   @ApiProperty({ description: 'Tỷ lệ thành công (%)', example: 78.4 })
   successRate: number;
+
+  @ApiProperty({ 
+    description: 'Thống kê đơn hàng theo trạng thái',
+    example: {
+      pending: 50,
+      confirmed: 30,
+      shipping: 25,
+      delivered: 980,
+      cancelled: 270,
+      'return-pending': 5,
+      'return-approved': 3,
+      'return-processing': 2,
+      'return-completed': 8,
+      'return-rejected': 1
+    }
+  })
+  orderStatusStats: {
+    pending: number;
+    confirmed: number;
+    shipping: number;
+    delivered: number;
+    cancelled: number;
+    'return-pending': number;
+    'return-approved': number;
+    'return-processing': number;
+    'return-completed': number;
+    'return-rejected': number;
+  };
 }
 
 export class TopProductDto {

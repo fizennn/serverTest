@@ -10,10 +10,12 @@ import { sampleProduct } from '../../utils/data/product';
 import { Product, ProductDocument } from '../schemas/product.schema';
 import { PaginatedResponse } from '../../shared/types';
 import { Order } from '../../orders/schemas/order.schema';
+import { NotificationService } from '@/notifications/notifications.service';
 
 @Injectable()
 export class ProductsService {
   constructor(
+    private readonly notificationService: NotificationService,
     @InjectModel(Product.name) private productModel: Model<Product>,
     @InjectModel(Order.name) private orderModel: Model<Order>,
   ) {}
@@ -87,7 +89,7 @@ export class ProductsService {
         minRating,
         inStock,
         sortBy = 'createdAt',
-        sortOrder = 'desc'
+        sortOrder = 'desc',
       } = searchDto;
 
       const pageSize = isNaN(Number(limit)) ? 10 : parseInt(limit);
@@ -99,15 +101,25 @@ export class ProductsService {
       // Tìm kiếm theo từ khóa
       if (keyword) {
         const decodedKeyword = decodeURIComponent(keyword);
-        const searchPattern = decodedKeyword
-          .split(' ')
-          .map(term => `(?=.*${term})`)
-          .join('');
-        filter.$or = [
-          { name: { $regex: searchPattern, $options: 'i' } },
-          { description: { $regex: searchPattern, $options: 'i' } },
-          { brand: { $regex: searchPattern, $options: 'i' } },
-        ];
+        
+        // Kiểm tra xem keyword có phải là ObjectId hợp lệ không
+        const isObjectId = Types.ObjectId.isValid(decodedKeyword);
+        
+        if (isObjectId) {
+          // Nếu là ObjectId, tìm kiếm theo _id
+          filter._id = new Types.ObjectId(decodedKeyword);
+        } else {
+          // Nếu không phải ObjectId, tìm kiếm theo text như cũ
+          const searchPattern = decodedKeyword
+            .split(' ')
+            .map(term => `(?=.*${term})`)
+            .join('');
+          filter.$or = [
+            { name: { $regex: searchPattern, $options: 'i' } },
+            { description: { $regex: searchPattern, $options: 'i' } },
+            { brand: { $regex: searchPattern, $options: 'i' } },
+          ];
+        }
       }
 
       // Filter theo brand
@@ -156,9 +168,18 @@ export class ProductsService {
 
       // Xây dựng sort
       let sort: any = {};
-      const validSortFields = ['name', 'averagePrice', 'rating', 'createdAt', 'countInStock'];
+      const validSortFields = [
+        'name',
+        'averagePrice',
+        'rating',
+        'createdAt',
+        'countInStock',
+      ];
       const validSortOrders = ['asc', 'desc'];
-      if (validSortFields.includes(sortBy) && validSortOrders.includes(sortOrder)) {
+      if (
+        validSortFields.includes(sortBy) &&
+        validSortOrders.includes(sortOrder)
+      ) {
         sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
       } else {
         sort.createdAt = -1; // Mặc định sắp xếp theo ngày tạo mới nhất
@@ -230,7 +251,18 @@ export class ProductsService {
         reviews: [],
       };
     });
-    const createdProducts = await this.productModel.insertMany(processedProducts);
+    const createdProducts =
+      await this.productModel.insertMany(processedProducts);
+    await this.notificationService.sendNotificationToAdmins(
+      'Sản phẩm mới được tạo',
+      `${createdProducts.length} sản phẩm mới đã được thêm vào hệ thống`,
+      'info',
+      {
+        action: 'bulk_create_products',
+        productCount: createdProducts.length,
+        productNames: createdProducts.slice(0, 3).map(p => p.name),
+      },
+    );
     return createdProducts as unknown as ProductDocument[];
   }
 
@@ -241,8 +273,7 @@ export class ProductsService {
   }
 
   async update(id: string, attrs: Partial<Product>): Promise<ProductDocument> {
-    const { name, averagePrice, description, images, brand, category } =
-      attrs;
+    const { name, averagePrice, description, images, brand, category } = attrs;
 
     if (!Types.ObjectId.isValid(id))
       throw new BadRequestException('Invalid product ID.');
@@ -347,7 +378,18 @@ export class ProductsService {
     const product = await this.productModel.findById(id);
 
     if (!product) throw new NotFoundException('No product with given ID.');
+    const productName = product.name;
 
+    // Sau khi xóa:
+    await this.notificationService.sendUrgentNotificationToAdmins(
+      'Sản phẩm đã bị xóa',
+      `Sản phẩm "${productName}" đã bị xóa khỏi hệ thống`,
+      {
+        action: 'delete_product',
+        productId: id,
+        productName: productName,
+      },
+    );
     await product.deleteOne();
   }
 
@@ -358,10 +400,14 @@ export class ProductsService {
   async create(productData: Partial<Product>): Promise<ProductDocument> {
     // Tính toán giá trung bình nếu có variants hoặc sử dụng giá được gửi lên
     let averagePrice = productData.averagePrice || '0 - 0';
-    if (!productData.averagePrice && productData.variants && productData.variants.length > 0) {
+    if (
+      !productData.averagePrice &&
+      productData.variants &&
+      productData.variants.length > 0
+    ) {
       averagePrice = this.calculateAveragePrice(productData.variants);
     }
-    
+
     // Tính toán tổng số lượng tồn kho từ các biến thể
     let countInStock = productData.countInStock || 0;
     if (productData.variants && productData.variants.length > 0) {
@@ -386,7 +432,18 @@ export class ProductsService {
       numReviews: 0,
       reviews: [],
     });
-
+    await this.notificationService.sendNotificationToAdmins(
+      'Sản phẩm mới được thêm',
+      `Sản phẩm "${product.name}" đã được thêm vào hệ thống với ${countInStock} sản phẩm trong kho`,
+      'success',
+      {
+        action: 'create_product',
+        productId: product._id.toString(),
+        productName: product.name,
+        brand: product.brand,
+        initialStock: countInStock,
+      },
+    );
     return product;
   }
 
@@ -398,14 +455,16 @@ export class ProductsService {
       'variants._id': variantId,
     });
 
-    if (!products.length) 
-      throw new NotFoundException('Không tìm thấy sản phẩm nào với variant ID này.');
+    if (!products.length)
+      throw new NotFoundException(
+        'Không tìm thấy sản phẩm nào với variant ID này.',
+      );
 
     // Lọc và chỉ trả về variant có ID phù hợp
     const filteredProducts = products.map(product => {
       const productObj = product.toObject();
       productObj.variants = productObj.variants.filter(
-        (variant: any) => variant._id.toString() === variantId
+        (variant: any) => variant._id.toString() === variantId,
       );
       return productObj;
     });
@@ -421,19 +480,23 @@ export class ProductsService {
       'variants.sizes._id': sizeId,
     });
 
-    if (!products.length) 
-      throw new NotFoundException('Không tìm thấy sản phẩm nào với size ID này.');
+    if (!products.length)
+      throw new NotFoundException(
+        'Không tìm thấy sản phẩm nào với size ID này.',
+      );
 
     // Lọc và chỉ trả về size có ID phù hợp
     const filteredProducts = products.map(product => {
       const productObj = product.toObject();
-      productObj.variants = productObj.variants.map((variant: any) => {
-        const filteredVariant = { ...variant };
-        filteredVariant.sizes = variant.sizes.filter(
-          (size: any) => size._id.toString() === sizeId
-        );
-        return filteredVariant;
-      }).filter((variant: any) => variant.sizes.length > 0);
+      productObj.variants = productObj.variants
+        .map((variant: any) => {
+          const filteredVariant = { ...variant };
+          filteredVariant.sizes = variant.sizes.filter(
+            (size: any) => size._id.toString() === sizeId,
+          );
+          return filteredVariant;
+        })
+        .filter((variant: any) => variant.sizes.length > 0);
       return productObj;
     });
 
@@ -491,8 +554,13 @@ export class ProductsService {
     }, 0);
   }
 
-  async findByCategory(categoryId: string, page?: string, limit?: string): Promise<PaginatedResponse<Product>> {
-    if (!Types.ObjectId.isValid(categoryId)) throw new BadRequestException('Category ID không hợp lệ');
+  async findByCategory(
+    categoryId: string,
+    page?: string,
+    limit?: string,
+  ): Promise<PaginatedResponse<Product>> {
+    if (!Types.ObjectId.isValid(categoryId))
+      throw new BadRequestException('Category ID không hợp lệ');
     const pageSize = parseInt(limit ?? '10');
     const currentPage = parseInt(page ?? '1');
     const filter = { category: categoryId };
@@ -501,7 +569,10 @@ export class ProductsService {
       .find(filter)
       .limit(pageSize)
       .skip(pageSize * (currentPage - 1));
-    if (!products.length) throw new NotFoundException('Không tìm thấy sản phẩm nào với category này');
+    if (!products.length)
+      throw new NotFoundException(
+        'Không tìm thấy sản phẩm nào với category này',
+      );
     return {
       items: products,
       total: count,
@@ -510,7 +581,11 @@ export class ProductsService {
     };
   }
 
-  async returnStock(productId: string, variantName: string, quantity: number): Promise<void> {
+  async returnStock(
+    productId: string,
+    variantName: string,
+    quantity: number,
+  ): Promise<void> {
     if (!Types.ObjectId.isValid(productId)) {
       throw new BadRequestException('Invalid product ID');
     }
@@ -533,7 +608,17 @@ export class ProductsService {
 
     // Cập nhật tổng stock của sản phẩm
     product.countInStock = this.calculateTotalStock(product.variants);
-
+    await this.notificationService.sendNotificationToAdmins(
+      'Hoàn trả kho hàng',
+      `Sản phẩm "${product.name}" (${variantName}) đã được hoàn trả ${quantity} sản phẩm vào kho`,
+      'info',
+      {
+        action: 'return_stock',
+        productId: product._id.toString(),
+        productName: product.name,
+        returnedQuantity: quantity,
+      },
+    );
     await product.save();
   }
 }

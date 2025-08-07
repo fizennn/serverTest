@@ -39,7 +39,7 @@ export class ProductsController {
   @Get()
   @ApiOperation({ 
     summary: 'Tìm kiếm sản phẩm nâng cao',
-    description: 'Tìm kiếm sản phẩm với nhiều tiêu chí: từ khóa, brand, category, giá, rating, tồn kho, sắp xếp...'
+    description: 'Tìm kiếm sản phẩm với nhiều tiêu chí: từ khóa (tên, mô tả, brand, ID sản phẩm), brand, category, giá, rating, tồn kho, sắp xếp...'
   })
   @ApiResponse({ 
     status: 200, 

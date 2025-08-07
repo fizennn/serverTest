@@ -76,8 +76,8 @@ export class User {
   @Prop({ type: [Address], default: [] })
   addresses?: Address[];
 
-  @Prop({ type: [String], default: [] })
-  deviceId?: String[];
+  @Prop({ type: String, default: '' })
+  deviceId?: string;
 
   // Vai trò - quyền hạn sẽ được lấy từ role thay vì từ các thuộc tính trực tiếp
   @Prop({ type: 'ObjectId', ref: 'Role', default: null })

@@ -907,6 +907,66 @@ export class OrdersService {
     return this.updateStatus(id, { status: 'cancelled' });
   }
 
+  async cancelOrderAdmin(orderId: string): Promise<OrderDocument> {
+    const order = await this.orderModel.findById(orderId);
+
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+
+    // Admin có thể hủy đơn hàng ở bất kỳ trạng thái nào, trừ khi đã hoàn thành trả hàng
+    if (order.status === 'return-completed') {
+      throw new BadRequestException(
+        'Không thể hủy đơn hàng đã hoàn thành trả hàng',
+      );
+    }
+
+    // Hoàn trả voucher nếu có và đơn hàng chưa được giao
+    if (order.vouchers && order.vouchers.length > 0 && order.status !== 'delivered') {
+      for (const voucherInfo of order.vouchers) {
+        try {
+          // Nếu có userId, hoàn trả voucher cho user đó
+          if (order.idUser) {
+            await this.vouchersService.returnVoucherUsage(
+              voucherInfo.voucherId.toString(),
+              order.idUser.toString(),
+            );
+          } else {
+            // Nếu là guest order, chỉ tăng stock của voucher
+            await this.voucherModel.findByIdAndUpdate(voucherInfo.voucherId, {
+              $inc: { stock: 1 },
+            });
+          }
+        } catch (error) {
+          console.error('Lỗi khi hoàn trả voucher:', error);
+          // Không throw error để không ảnh hưởng đến việc hủy đơn hàng
+        }
+      }
+    }
+
+    // Hoàn trả tồn kho nếu đơn hàng chưa được giao
+    if (order.status !== 'delivered') {
+      for (const item of order.items) {
+        try {
+          await this.productsService.returnStock(
+            item.product._id.toString(),
+            item.variant,
+            item.quantity,
+          );
+        } catch (error) {
+          console.error('Lỗi khi hoàn trả tồn kho:', error);
+          // Không throw error để không ảnh hưởng đến việc hủy đơn hàng
+        }
+      }
+    }
+
+    // Cập nhật trạng thái đơn hàng thành cancelled
+    order.status = 'cancelled';
+    await order.save();
+
+    return order;
+  }
+
   async updatePaymentStatus(id: string, paymentStatus: 'unpaid' | 'paid' | 'refunded' | 'cancelled' | 'expired' | 'failed' | 'pending') {
     this.logger.log(`[UPDATE_PAYMENT_STATUS] Request received - OrderId: ${id}, PaymentStatus: ${paymentStatus}`);
 
@@ -1339,14 +1399,105 @@ export class OrdersService {
     const skip = (page - 1) * limit;
     const query: any = {};
 
-    // Tìm kiếm theo từ khóa (mã đơn hàng, tên khách hàng)
+        // Tìm kiếm theo từ khóa (mã đơn hàng, tên khách hàng, _id)
     if (keyword) {
       const keywordRegex = new RegExp(keyword, 'i');
-      query.$or = [
-        { orderCode: { $regex: keywordRegex } },
-        { 'idUser.name': { $regex: keywordRegex } },
-        { 'idUser.email': { $regex: keywordRegex } },
-      ];
+      
+      // Kiểm tra xem keyword có phải là ObjectId hợp lệ không
+      const isValidObjectId = Types.ObjectId.isValid(keyword);
+      
+      // Kiểm tra xem keyword có phải là số không (cho orderCode)
+      const isNumeric = !isNaN(Number(keyword));
+      
+      if (isValidObjectId) {
+        // Nếu keyword là ObjectId hợp lệ, tìm kiếm theo _id
+        query._id = new Types.ObjectId(keyword);
+      } else if (isNumeric) {
+        // Nếu keyword là số, tìm kiếm theo orderCode
+        query.orderCode = parseInt(keyword);
+      } else {
+        // Nếu keyword không phải số và không phải ObjectId, tìm kiếm theo tên khách hàng đã đăng ký
+        // Sử dụng aggregation để populate và tìm kiếm
+        const aggregationPipeline: any[] = [
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'idUser',
+              foreignField: '_id',
+              as: 'userInfo'
+            }
+          },
+          {
+            $match: {
+              $or: [
+                // Tìm kiếm trong thông tin user đã đăng ký
+                { 'userInfo.name': { $regex: keywordRegex } },
+                { 'userInfo.email': { $regex: keywordRegex } }
+              ]
+            }
+          },
+          {
+            $lookup: {
+              from: 'products',
+              localField: 'items.product',
+              foreignField: '_id',
+              as: 'productInfo'
+            }
+          }
+        ];
+
+        // Thêm sort stage
+        if (sortBy === SortField.CUSTOMER_NAME) {
+          aggregationPipeline.push({
+            $sort: { 'userInfo.name': sortOrder === SortOrder.ASC ? 1 : -1 }
+          });
+        } else {
+          aggregationPipeline.push({
+            $sort: { [sortBy]: sortOrder === SortOrder.ASC ? 1 : -1 }
+          });
+        }
+
+        aggregationPipeline.push(
+          { $skip: skip },
+          { $limit: limit }
+        );
+
+        const [data, totalResult] = await Promise.all([
+          this.orderModel.aggregate(aggregationPipeline),
+          this.orderModel.aggregate([
+            {
+              $lookup: {
+                from: 'users',
+                localField: 'idUser',
+                foreignField: '_id',
+                as: 'userInfo'
+              }
+            },
+            {
+              $match: {
+                $or: [
+                  // Tìm kiếm trong thông tin user đã đăng ký
+                  { 'userInfo.name': { $regex: keywordRegex } },
+                  { 'userInfo.email': { $regex: keywordRegex } }
+                ]
+              }
+            },
+            {
+              $count: 'total'
+            }
+          ])
+        ]);
+
+        const total = totalResult.length > 0 ? totalResult[0].total : 0;
+
+        return {
+          data: data as any,
+          total,
+          pages: Math.ceil(total / limit),
+          currentPage: page,
+          limit,
+        };
+      }
     }
 
     // Tìm kiếm theo trạng thái đơn hàng

@@ -154,7 +154,8 @@ export class UsersService {
     // Chỉ lấy các trường cho phép cập nhật
     const updateData: Partial<User> = {};
     if (attrs.name !== undefined) updateData.name = attrs.name;
-    if (attrs.profilePicture !== undefined) updateData.profilePicture = attrs.profilePicture;
+    if (attrs.profilePicture !== undefined)
+      updateData.profilePicture = attrs.profilePicture;
     if (attrs.country !== undefined) updateData.country = attrs.country;
     if (attrs.dateOfBirth !== undefined) {
       if (typeof attrs.dateOfBirth === 'string') {
@@ -173,7 +174,7 @@ export class UsersService {
         if (attrs.roleId && !Types.ObjectId.isValid(attrs.roleId)) {
           throw new BadRequestException('Invalid role ID');
         }
-        
+
         // Kiểm tra role có tồn tại không (nếu roleId được cung cấp)
         if (attrs.roleId) {
           const role = await this.roleModel.findById(attrs.roleId);
@@ -181,7 +182,7 @@ export class UsersService {
             throw new NotFoundException('Không tìm thấy role');
           }
         }
-        
+
         updateData.roleId = attrs.roleId;
       }
     }
@@ -195,14 +196,13 @@ export class UsersService {
     );
 
     try {
-      const updatedUser = await this.userModel.findByIdAndUpdate(
-        id,
-        updateData,
-        { new: true, runValidators: true },
-      ).populate({
-        path: 'roleId',
-        select: 'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt'
-      });
+      const updatedUser = await this.userModel
+        .findByIdAndUpdate(id, updateData, { new: true, runValidators: true })
+        .populate({
+          path: 'roleId',
+          select:
+            'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt',
+        });
 
       if (!updatedUser) {
         throw new NotFoundException(`User with ID ${id} not found`);
@@ -305,7 +305,10 @@ export class UsersService {
     return user;
   }
 
-  async removeFavoriteProduct(userId: string, productId: string): Promise<UserDocument> {
+  async removeFavoriteProduct(
+    userId: string,
+    productId: string,
+  ): Promise<UserDocument> {
     if (!Types.ObjectId.isValid(userId)) {
       throw new BadRequestException('Invalid user ID');
     }
@@ -314,14 +317,21 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
     if (!user.favoriteProducts?.includes(productId)) {
-      throw new BadRequestException('Sản phẩm không có trong danh sách yêu thích');
+      throw new BadRequestException(
+        'Sản phẩm không có trong danh sách yêu thích',
+      );
     }
-    user.favoriteProducts = user.favoriteProducts.filter(id => id !== productId);
+    user.favoriteProducts = user.favoriteProducts.filter(
+      id => id !== productId,
+    );
     await user.save();
     return user;
   }
 
-  async isProductFavorited(userId: string, productId: string): Promise<boolean> {
+  async isProductFavorited(
+    userId: string,
+    productId: string,
+  ): Promise<boolean> {
     if (!Types.ObjectId.isValid(userId)) {
       throw new BadRequestException('Invalid user ID');
     }
@@ -343,7 +353,9 @@ export class UsersService {
     const ids = user.favoriteProducts || [];
     if (ids.length === 0) return [];
     // Lấy chi tiết sản phẩm
-    const products = await Promise.all(ids.map(id => this.productsService.findById(id).catch(() => null)));
+    const products = await Promise.all(
+      ids.map(id => this.productsService.findById(id).catch(() => null)),
+    );
     // Lọc ra các sản phẩm hợp lệ
     return products.filter(p => p);
   }
@@ -363,7 +375,7 @@ export class UsersService {
     }
 
     const newAddress: Address = {
-      name:addressData.name,
+      name: addressData.name,
       phone: addressData.phone,
       address: addressData.address,
     };
@@ -507,7 +519,8 @@ export class UsersService {
         .find({ isAdmin: true })
         .populate({
           path: 'roleId',
-          select: 'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt'
+          select:
+            'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt',
         })
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -531,7 +544,7 @@ export class UsersService {
   ): Promise<PaginatedResponse<UserDocument>> {
     try {
       const skip = (page - 1) * limit;
-      
+
       const matchStage: any = { isAdmin: true };
       matchStage[`roleId.${permission}`] = true;
 
@@ -540,7 +553,8 @@ export class UsersService {
           .find(matchStage)
           .populate({
             path: 'roleId',
-            select: 'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt'
+            select:
+              'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt',
           })
           .sort({ createdAt: -1 })
           .skip(skip)
@@ -669,7 +683,8 @@ export class UsersService {
       // Populate roleId để trả về thông tin đầy đủ
       const updatedUser = await this.userModel.findById(userId).populate({
         path: 'roleId',
-        select: 'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt'
+        select:
+          'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt',
       });
 
       return updatedUser;
@@ -715,7 +730,8 @@ export class UsersService {
           .find({ roleId, isAdmin: true })
           .populate({
             path: 'roleId',
-            select: 'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt'
+            select:
+              'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt',
           })
           .sort({ createdAt: -1 })
           .skip(skip)
@@ -738,8 +754,10 @@ export class UsersService {
   async getEmployeeStatistics() {
     try {
       // Lấy tổng số nhân viên
-      const totalEmployees = await this.userModel.countDocuments({ isAdmin: true });
-      
+      const totalEmployees = await this.userModel.countDocuments({
+        isAdmin: true,
+      });
+
       // Lấy nhân viên theo role
       const employeesByRole = await this.userModel.aggregate([
         { $match: { isAdmin: true } },
@@ -748,20 +766,20 @@ export class UsersService {
             from: 'roles',
             localField: 'roleId',
             foreignField: '_id',
-            as: 'role'
-          }
+            as: 'role',
+          },
         },
         {
-          $unwind: '$role'
+          $unwind: '$role',
         },
         {
           $group: {
             _id: '$roleId',
             count: { $sum: 1 },
-            roleName: { $first: '$role.name' }
-          }
+            roleName: { $first: '$role.name' },
+          },
         },
-        { $sort: { count: -1 } }
+        { $sort: { count: -1 } },
       ]);
 
       // Lấy thống kê theo quyền
@@ -772,11 +790,11 @@ export class UsersService {
             from: 'roles',
             localField: 'roleId',
             foreignField: '_id',
-            as: 'role'
-          }
+            as: 'role',
+          },
         },
         {
-          $unwind: '$role'
+          $unwind: '$role',
         },
         {
           $group: {
@@ -789,9 +807,9 @@ export class UsersService {
             isBanner: { $sum: { $cond: ['$role.isBanner', 1, 0] } },
             isAnalytic: { $sum: { $cond: ['$role.isAnalytic', 1, 0] } },
             isReturn: { $sum: { $cond: ['$role.isReturn', 1, 0] } },
-            isUser: { $sum: { $cond: ['$role.isUser', 1, 0] } }
-          }
-        }
+            isUser: { $sum: { $cond: ['$role.isUser', 1, 0] } },
+          },
+        },
       ]);
 
       // Lấy nhân viên gần đây
@@ -799,7 +817,7 @@ export class UsersService {
         .find({ isAdmin: true })
         .populate({
           path: 'roleId',
-          select: 'name description'
+          select: 'name description',
         })
         .sort({ createdAt: -1 })
         .limit(10)
@@ -818,9 +836,9 @@ export class UsersService {
           isBanner: 0,
           isAnalytic: 0,
           isReturn: 0,
-          isUser: 0
+          isUser: 0,
         },
-        recentEmployees
+        recentEmployees,
       };
     } catch (error) {
       this.logger.error(`Failed to get employee statistics: ${error.message}`);
@@ -828,30 +846,33 @@ export class UsersService {
     }
   }
 
-  async getEmployeeActivityStatistics(dateRange?: { startDate: string; endDate: string }) {
+  async getEmployeeActivityStatistics(dateRange?: {
+    startDate: string;
+    endDate: string;
+  }) {
     try {
       const matchStage: any = { isAdmin: true };
-      
+
       if (dateRange?.startDate && dateRange?.endDate) {
         matchStage.lastLogin = {
           $gte: new Date(dateRange.startDate),
-          $lte: new Date(dateRange.endDate)
+          $lte: new Date(dateRange.endDate),
         };
       }
 
       // Tổng số lần đăng nhập
       const totalLogins = await this.userModel.countDocuments({
         ...matchStage,
-        lastLogin: { $exists: true, $ne: null }
+        lastLogin: { $exists: true, $ne: null },
       });
 
       // Người dùng hoạt động (đăng nhập trong 30 ngày qua)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
+
       const activeUsers = await this.userModel.countDocuments({
         isAdmin: true,
-        lastLogin: { $gte: thirtyDaysAgo }
+        lastLogin: { $gte: thirtyDaysAgo },
       });
 
       // Người dùng không hoạt động
@@ -860,8 +881,8 @@ export class UsersService {
         $or: [
           { lastLogin: { $lt: thirtyDaysAgo } },
           { lastLogin: { $exists: false } },
-          { lastLogin: null }
-        ]
+          { lastLogin: null },
+        ],
       });
 
       // Xu hướng đăng nhập theo ngày
@@ -871,26 +892,30 @@ export class UsersService {
           $group: {
             _id: {
               $dateToString: {
-                format: "%Y-%m-%d",
-                date: "$lastLogin"
-              }
+                format: '%Y-%m-%d',
+                date: '$lastLogin',
+              },
             },
-            count: { $sum: 1 }
-          }
+            count: { $sum: 1 },
+          },
         },
         { $sort: { _id: -1 } },
-        { $limit: 30 }
+        { $limit: 30 },
       ]);
 
       return {
         totalLogins,
         activeUsers,
         inactiveUsers,
-        loginTrends
+        loginTrends,
       };
     } catch (error) {
-      this.logger.error(`Failed to get employee activity statistics: ${error.message}`);
-      throw new BadRequestException('Failed to get employee activity statistics');
+      this.logger.error(
+        `Failed to get employee activity statistics: ${error.message}`,
+      );
+      throw new BadRequestException(
+        'Failed to get employee activity statistics',
+      );
     }
   }
 }

@@ -465,12 +465,12 @@ export class OrdersController {
     summary: 'Tìm kiếm đơn hàng nâng cao (Admin)',
     description: 'Tìm kiếm đơn hàng với nhiều tiêu chí: từ khóa, trạng thái, khoảng thời gian, khoảng giá, sắp xếp...',
   })
-  @ApiQuery({
-    name: 'keyword',
-    required: false,
-    description: 'Từ khóa tìm kiếm (mã đơn hàng, tên khách hàng)',
-    example: 'ORD123456',
-  })
+        @ApiQuery({
+        name: 'keyword',
+        required: false,
+        description: 'Từ khóa tìm kiếm (ID đơn hàng, mã đơn hàng, tên/email khách hàng đã đăng ký)',
+        example: '507f1f77bcf86cd799439011',
+      })
   @ApiQuery({
     name: 'status',
     required: false,
@@ -717,6 +717,24 @@ export class OrdersController {
     @CurrentUser() user: UserDocument,
   ) {
     return this.ordersService.cancelUserOrder(id, user._id.toString());
+  }
+
+  @UseGuards(AdminGuard)
+  @Put(':id/cancel-admin')
+  @ApiOperation({
+    summary: 'Hủy đơn hàng (Admin)',
+    description:
+      'Admin có thể hủy bất kỳ đơn hàng nào, bất kể trạng thái hiện tại. Hệ thống sẽ hoàn trả voucher và tồn kho nếu cần thiết.',
+  })
+  @ApiParam({ name: 'id', description: 'ID đơn hàng' })
+  @ApiResponse({ status: 200, description: 'Hủy đơn hàng thành công' })
+  @ApiResponse({
+    status: 400,
+    description: 'Không thể hủy đơn hàng ở trạng thái hiện tại',
+  })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy đơn hàng' })
+  async cancelOrderAdmin(@Param('id') id: string) {
+    return this.ordersService.cancelOrderAdmin(id);
   }
   @UseGuards(AdminGuard)
   @Put(':id/payment-status')

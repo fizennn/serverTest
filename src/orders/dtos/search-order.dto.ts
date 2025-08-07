@@ -32,11 +32,11 @@ export enum SortOrder {
 }
 
 export class AdvancedSearchOrderDto {
-  @ApiProperty({
-    description: 'Từ khóa tìm kiếm nhanh (mã đơn hàng, tên khách hàng)',
-    example: 'ORD123456',
-    required: false
-  })
+        @ApiProperty({
+        description: 'Từ khóa tìm kiếm nhanh (ID đơn hàng, mã đơn hàng, tên/email khách hàng đã đăng ký)',
+        example: '507f1f77bcf86cd799439011',
+        required: false
+      })
   @IsOptional()
   @IsString()
   keyword?: string;

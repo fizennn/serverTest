@@ -36,7 +36,7 @@ export class Upload {
 
   @ApiProperty({
     description: 'URL để truy cập file',
-    example: 'https://170.64.217.145/v1/uploads/image-1703123456789-123456789.jpg'
+    example: 'https://209.38.83.181/v1/uploads/image-1703123456789-123456789.jpg'
   })
   @Prop({ required: true })
   url: string;

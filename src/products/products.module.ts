@@ -6,6 +6,7 @@ import { Product, ProductSchema } from './schemas/product.schema';
 import { AppService } from '@/app/services/app.service';
 import { Order } from '@/orders/schemas/order.schema';
 import { OrderSchema } from '@/orders/schemas/order.schema';
+import { NotificationModule } from '@/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -19,7 +20,10 @@ import { OrderSchema } from '@/orders/schemas/order.schema';
         schema: OrderSchema,
       },
     ]),
+    
+    NotificationModule,
   ],
+  
   providers: [ProductsService, AppService],
   controllers: [ProductsController],
   exports: [ProductsService, MongooseModule],

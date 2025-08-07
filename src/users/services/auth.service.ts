@@ -37,10 +37,11 @@ export class AuthService {
     const userWithRole = await this.userModel
       .findById(user._id)
       .populate('roleId');
-    if (user.deviceId) {
-      await this.userModel.findByIdAndUpdate(user._id, {
-        deviceId: user.deviceId,
-      });
+    if (user?.deviceId) {
+      const currentUser = await this.userModel.findById(user._id);
+      if (currentUser.deviceId) {
+        currentUser.deviceId = user.deviceId;
+      }
     }
     const tokens = await this.generateTokens(userWithRole);
 

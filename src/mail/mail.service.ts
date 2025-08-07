@@ -39,7 +39,7 @@ export class MailService {
   }
 
   static generateActivationLink(userId: string, token: string): string {
-    const appUrl ='https://170.64.217.145/v1';
+    const appUrl ='https://209.38.83.181/v1';
     return `${appUrl}/auth/activate?userId=${userId}&token=${token}`;
   }
 
