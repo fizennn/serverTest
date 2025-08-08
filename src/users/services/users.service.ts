@@ -141,7 +141,11 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
   }
-
+  async updatePass(id: string, pass: string) {
+    return await this.userModel.findByIdAndUpdate(id, {
+      password: pass,
+    });
+  }
   async update(
     id: string,
     attrs: Partial<User>,
@@ -269,7 +273,7 @@ export class UsersService {
     const user = await this.userModel.findByIdAndUpdate(
       userId,
       { $pull: { vouchers: voucherId } }, // Sử dụng $pull để xóa voucherId khỏi mảng vouchers
-      { new: true } // Trả về document đã được cập nhật
+      { new: true }, // Trả về document đã được cập nhật
     );
 
     if (!user) {
@@ -281,13 +285,18 @@ export class UsersService {
       await vouchersService.removeUserFromVoucher(voucherId, userId);
     } catch (error) {
       // Log lỗi nhưng không dừng lại, vì mục tiêu chính là xóa voucher khỏi user
-      console.warn(`Could not remove user from voucher ${voucherId} in voucher collection: ${error.message}`);
+      console.warn(
+        `Could not remove user from voucher ${voucherId} in voucher collection: ${error.message}`,
+      );
     }
-    
+
     return user;
   }
 
-  async addFavoriteProduct(userId: string, productId: string): Promise<UserDocument> {
+  async addFavoriteProduct(
+    userId: string,
+    productId: string,
+  ): Promise<UserDocument> {
     if (!Types.ObjectId.isValid(userId)) {
       throw new BadRequestException('Invalid user ID');
     }

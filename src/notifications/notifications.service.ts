@@ -108,14 +108,25 @@ export class NotificationService {
   }
   // Hàm gốc của bạn
   async sendPushNotification(pushNotificationDto: PushNotificationDto) {
-    const { token, title, body, metadata } = pushNotificationDto;
+    const { userId, title, body, metadata } = pushNotificationDto;
+    const user = await this.userModel.findById(userId);
+    const notification = new this.notificationModel({
+      userId,
+      title,
+      body,
+      metadata: metadata || {},
+      isRead: false,
+      sentAt: new Date(),
+    });
 
-    if (!Expo.isExpoPushToken(token)) {
+    const savedNotification = await notification.save();
+
+    if (!Expo.isExpoPushToken(user.deviceId)) {
       throw new Error('Invalid push token');
     }
 
     const message = {
-      to: token,
+      to: user.deviceId,
       sound: 'default' as const,
       title: title,
       body: body,

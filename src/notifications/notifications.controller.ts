@@ -21,6 +21,7 @@ import {
 } from '@nestjs/swagger';
 import { NotificationService } from './notifications.service';
 import { PushNotificationDto } from './pushnotification.dto';
+import { JwtAuthGuard } from '@/guards';
 
 @ApiTags('Thông báo')
 @Controller('api/notifications')
@@ -113,6 +114,8 @@ export class NotificationController {
       },
     },
   })
+
+    @UseGuards(JwtAuthGuard)
   async getNotifications(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,

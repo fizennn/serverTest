@@ -33,6 +33,8 @@ import { NotAuthenticatedGuard } from '@/guards/not-authenticated.guard';
 import { RefreshTokenDto } from '../dtos/refreshtoken.dto';
 import { JwtService } from '@nestjs/jwt';
 import { hashPassword } from '@/utils/password';
+import { use } from 'passport';
+import { log } from 'console';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -50,7 +52,8 @@ export class AuthController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Đăng nhập thành công trả ra token và thông tin user bao gồm voucher',
+    description:
+      'Đăng nhập thành công trả ra token và thông tin user bao gồm voucher',
     type: AuthResponseDto,
   })
   @ApiResponse({
@@ -69,13 +72,19 @@ export class AuthController {
       loginDto.email,
       loginDto.password,
     );
+
     if (!user.isActive) {
       throw new UnauthorizedException({
         message: 'Tài khoản chưa được kích hoạt',
         user: undefined,
       });
     }
+    if (loginDto?.deviceId) {
+      user.deviceId = loginDto?.deviceId;
+      await user.save();
+    }
     const { tokens, user: userData } = await this.authService.login(user);
+    console.log('devicdeId', user.deviceId);
     return { user: userData, tokens };
   }
 
@@ -340,6 +349,7 @@ export class AuthController {
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
     const { oldPassword, newPassword } = changePasswordDto;
+    console.log({ oldPassword, newPassword });
     if (!newPassword || !oldPassword) {
       throw new BadRequestException({
         messsage: 'Vui lòng điền đủ thông tin',
@@ -353,11 +363,10 @@ export class AuthController {
     if (!isValid) {
       throw new BadRequestException('Mật khẩu cũ không đúng');
     }
-
+    console.log(user._id.toString());
     // Băm và cập nhật mật khẩu mới
-    await this.usersService.update(user._id.toString(), {
-      password: await hashPassword(newPassword),
-    });
+    const newpasss = await hashPassword(newPassword);
+    await this.usersService.updatePass(user._id.toString(), newpasss);
 
     return { success: true, message: 'Đổi mật khẩu thành công' };
   }

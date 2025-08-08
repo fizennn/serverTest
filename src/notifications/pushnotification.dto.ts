@@ -3,12 +3,12 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class PushNotificationDto {
   @ApiProperty({
-    description: 'Mã token push của Expo',
-    example: 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]',
+    description: 'id người dùng',
+    example: '6856a319d5de354a72852ffe',
   })
   @IsString()
   @IsNotEmpty()
-  token: string;
+  userId: string;
 
   @ApiProperty({
     description: 'Tiêu đề thông báo',

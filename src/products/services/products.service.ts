@@ -221,26 +221,30 @@ export class ProductsService {
     // Xử lý từng sản phẩm để tính averagePrice và countInStock
     const processedProducts = products.map(productData => {
       // Đảm bảo variants là array hợp lệ và xử lý image
-      const variants = productData.variants && Array.isArray(productData.variants) 
-        ? productData.variants.map(variant => ({
-            ...variant,
-            image: variant.image || '', // Đảm bảo image luôn có giá trị
-            sizes: variant.sizes && Array.isArray(variant.sizes) ? variant.sizes : []
-          }))
-        : [];
-      
+      const variants =
+        productData.variants && Array.isArray(productData.variants)
+          ? productData.variants.map(variant => ({
+              ...variant,
+              image: variant.image || '', // Đảm bảo image luôn có giá trị
+              sizes:
+                variant.sizes && Array.isArray(variant.sizes)
+                  ? variant.sizes
+                  : [],
+            }))
+          : [];
+
       // Tính toán giá trung bình nếu có variants hoặc sử dụng giá được gửi lên
       let averagePrice = productData.averagePrice || '0 - 0';
       if (!productData.averagePrice && variants.length > 0) {
         averagePrice = this.calculateAveragePrice(variants);
       }
-      
+
       // Tính toán tổng số lượng tồn kho từ các biến thể
       let countInStock = productData.countInStock || 0;
       if (variants.length > 0) {
         countInStock = this.calculateTotalStock(variants);
       }
-      
+
       return {
         ...productData,
         variants,
@@ -291,15 +295,18 @@ export class ProductsService {
     // Xử lý variants và tính toán lại giá trung bình
     if (attrs.variants !== undefined) {
       // Đảm bảo variants là array hợp lệ và xử lý image
-      const variants = Array.isArray(attrs.variants) 
+      const variants = Array.isArray(attrs.variants)
         ? attrs.variants.map(variant => ({
             ...variant,
             image: variant.image || '', // Đảm bảo image luôn có giá trị
-            sizes: variant.sizes && Array.isArray(variant.sizes) ? variant.sizes : []
+            sizes:
+              variant.sizes && Array.isArray(variant.sizes)
+                ? variant.sizes
+                : [],
           }))
         : [];
       product.variants = variants;
-      
+
       // Tính toán lại giá trung bình và tồn kho
       if (variants.length > 0) {
         product.averagePrice = this.calculateAveragePrice(variants);
@@ -415,13 +422,17 @@ export class ProductsService {
     }
 
     // Đảm bảo variants là array hợp lệ và xử lý image
-    const variants = productData.variants && Array.isArray(productData.variants) 
-      ? productData.variants.map(variant => ({
-          ...variant,
-          image: variant.image || '', // Đảm bảo image luôn có giá trị
-          sizes: variant.sizes && Array.isArray(variant.sizes) ? variant.sizes : []
-        }))
-      : [];
+    const variants =
+      productData.variants && Array.isArray(productData.variants)
+        ? productData.variants.map(variant => ({
+            ...variant,
+            image: variant.image || '', // Đảm bảo image luôn có giá trị
+            sizes:
+              variant.sizes && Array.isArray(variant.sizes)
+                ? variant.sizes
+                : [],
+          }))
+        : [];
 
     const product = await this.productModel.create({
       ...productData,
@@ -510,18 +521,18 @@ export class ProductsService {
    */
   private calculateAveragePrice(variants: any[]): string {
     // Lấy tất cả giá từ tất cả sizes của tất cả variants
-    const allPrices = variants.flatMap(variant => 
-      variant.sizes ? variant.sizes.map(size => size.price || 0) : []
+    const allPrices = variants.flatMap(variant =>
+      variant.sizes ? variant.sizes.map(size => size.price || 0) : [],
     );
-    
+
     // Kiểm tra nếu không có giá nào
     if (allPrices.length === 0) {
       return '0 - 0';
     }
-    
+
     // Lọc bỏ các giá 0 hoặc undefined
     const validPrices = allPrices.filter(price => price > 0);
-    
+
     if (validPrices.length === 0) {
       return '0 - 0';
     }
@@ -543,13 +554,16 @@ export class ProductsService {
       if (!variant.sizes || !Array.isArray(variant.sizes)) {
         return totalStock;
       }
-      
+
       const variantStock = variant.sizes.reduce((acc, size) => {
         // Kiểm tra nếu size có stock và là số hợp lệ
         const stockValue = size.stock || 0;
-        return acc + (typeof stockValue === 'number' && stockValue >= 0 ? stockValue : 0);
+        return (
+          acc +
+          (typeof stockValue === 'number' && stockValue >= 0 ? stockValue : 0)
+        );
       }, 0);
-      
+
       return totalStock + variantStock;
     }, 0);
   }

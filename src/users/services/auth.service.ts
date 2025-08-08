@@ -37,12 +37,7 @@ export class AuthService {
     const userWithRole = await this.userModel
       .findById(user._id)
       .populate('roleId');
-    if (user?.deviceId) {
-      const currentUser = await this.userModel.findById(user._id);
-      if (currentUser.deviceId) {
-        currentUser.deviceId = user.deviceId;
-      }
-    }
+
     const tokens = await this.generateTokens(userWithRole);
 
     // Populate vouchers data - lấy tất cả voucher mà user có quyền sử dụng
@@ -83,6 +78,7 @@ export class AuthService {
         createdAt: userWithRole.createdAt,
         vouchers: userVouchers,
         roleId: userWithRole.roleId,
+        deviceId:user.deviceId
       },
     };
   }
