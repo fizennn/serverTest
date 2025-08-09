@@ -15,7 +15,11 @@ export class UploadService {
   ) {}
 
   generateFileUrl(filename: string): string {
-    const serverLink = 'https://209.38.83.181/v1';
+    // Sử dụng cấu hình động thay vì hardcode
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const host = process.env.HOST || 'localhost';
+    const port = process.env.PORT || 3001;
+    const serverLink = `${protocol}://${host}:${port}/v1`;
     return `${serverLink}/uploads/${filename}`;
   }
 

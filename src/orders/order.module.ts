@@ -10,6 +10,7 @@ import { ProductsModule } from '../products/products.module';
 import { VouchersModule } from '../vouchers/vouchers.module';
 import { forwardRef } from '@nestjs/common';
 import { PayOSModule } from '../payOS/payOS.module';
+import { NotificationModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { PayOSModule } from '../payOS/payOS.module';
     ProductsModule,
     VouchersModule,
     forwardRef(() => PayOSModule),
+    NotificationModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

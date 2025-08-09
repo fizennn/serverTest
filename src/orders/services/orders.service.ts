@@ -18,6 +18,7 @@ import { Voucher } from '../../vouchers/schemas/voucher.schema';
 import { ProductsService } from '../../products/services/products.service';
 import { VouchersService } from '../../vouchers/services/vouchers.service';
 import { PayOSService } from '../../payOS/services/payOS.service';
+import { NotificationService } from '../../notifications/notifications.service';
 import { AdvancedSearchOrderDto, PaginatedSearchOrderResponseDto, SortField, SortOrder } from '../dtos/search-order.dto';
 
 @Injectable()
@@ -33,6 +34,7 @@ export class OrdersService {
     private vouchersService: VouchersService,
     @Inject(forwardRef(() => PayOSService))
     private payOSService: PayOSService,
+    private notificationService: NotificationService,
   ) {}
 
   async cancelUserOrder(orderId: string, userId: string) {
@@ -70,6 +72,12 @@ export class OrdersService {
     // Hoàn trả tồn kho
     for (const item of order.items) {
       try {
+        console.log(`[CANCEL_ORDER] Returning stock for item:`, {
+          productId: item.product._id.toString(),
+          variant: item.variant,
+          quantity: item.quantity
+        });
+        
         await this.productsService.returnStock(
           item.product._id.toString(),
           item.variant,
@@ -83,6 +91,42 @@ export class OrdersService {
 
     order.status = 'cancelled';
     await order.save();
+
+    // Gửi thông báo cho admin khi đơn hàng bị hủy
+    try {
+      await this.notificationService.sendNotificationToAdmins(
+        'Đơn hàng đã bị hủy',
+        `Đơn hàng ${order.orderCode || order._id} đã bị hủy bởi người dùng`,
+        'system',
+        {
+          userId: order._id.toString(),
+          action: 'order_cancelled'
+        },
+        true
+      );
+    } catch (error) {
+      console.error('Lỗi khi gửi thông báo hủy đơn hàng cho admin:', error);
+    }
+
+    // Gửi thông báo cho user khi đơn hàng bị hủy
+    try {
+      const user = await this.userModel.findById(userId);
+      if (user) {
+        await this.notificationService.sendAndSaveNotification(
+          userId,
+          user.deviceId || null,
+          'Đơn hàng đã được hủy',
+          `Đơn hàng ${order.orderCode || order._id} đã được hủy thành công`,
+          'order_cancelled',
+          {
+            userId: order._id.toString(),
+            action: 'order_cancelled'
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Lỗi khi gửi thông báo hủy đơn hàng cho user:', error);
+    }
 
     return { message: 'Hủy đơn hàng thành công' };
   }
@@ -318,6 +362,40 @@ export class OrdersService {
         .exec();
 
       console.log('Populated order vouchers:', populatedOrder.vouchers);
+      
+      // Gửi thông báo cho admin khi có đơn hàng mới
+      try {
+        await this.notificationService.sendNotificationToAdmins(
+          'Đơn hàng mới đã được tạo',
+          `Đơn hàng ${orderCode} đã được tạo`,
+          'system',
+          {
+            userId: createdOrder._id.toString(),
+            action: 'order'
+          },
+          true
+        );
+      } catch (error) {
+        console.error('Lỗi khi gửi thông báo cho admin:', error);
+      }
+
+      // Gửi thông báo cho user khi đơn hàng được tạo thành công
+      try {
+        await this.notificationService.sendAndSaveNotification(
+          userId,
+          user.deviceId || null,
+          'Đơn hàng đã được tạo thành công',
+          `Đơn hàng ${orderCode} đã được tạo thành công`,
+          'order',
+          {
+            userId: createdOrder._id.toString(),
+            action: 'order'
+          }
+        );
+      } catch (error) {
+        console.error('Lỗi khi gửi thông báo cho user:', error);
+      }
+      
       return populatedOrder;
     } catch (error) {
       // Log lỗi để debug
@@ -547,6 +625,43 @@ export class OrdersService {
         .exec();
 
       console.log('Populated admin order vouchers:', populatedOrder.vouchers);
+      
+      // Gửi thông báo cho admin khi có đơn hàng mới được tạo bởi admin
+      try {
+        await this.notificationService.sendNotificationToAdmins(
+          'Đơn hàng mới đã được tạo bởi admin',
+          `Đơn hàng ${orderCode} đã được tạo bởi admin`,
+          'system',
+          {
+            userId: createdOrder._id.toString(),
+            action: 'order_admin_created'
+          },
+          true
+        );
+      } catch (error) {
+        console.error('Lỗi khi gửi thông báo cho admin:', error);
+      }
+
+      // Gửi thông báo cho user khi đơn hàng được tạo thành công
+      try {
+        const user = await this.userModel.findById(userId);
+        if (user) {
+          await this.notificationService.sendAndSaveNotification(
+            userId,
+            user.deviceId || null,
+            'Đơn hàng đã được tạo thành công',
+            `Đơn hàng ${orderCode} đã được tạo thành công bởi admin`,
+            'order_admin_created',
+            {
+              userId: createdOrder._id.toString(),
+              action: 'order_admin_created'
+            }
+          );
+        }
+      } catch (error) {
+        console.error('Lỗi khi gửi thông báo cho user:', error);
+      }
+      
       return populatedOrder;
     } catch (error) {
       // Log lỗi để debug
@@ -776,6 +891,23 @@ export class OrdersService {
         .exec();
 
       console.log('Populated guest order vouchers:', populatedOrder.vouchers);
+      
+      // Gửi thông báo cho admin khi có đơn hàng mới được tạo bởi guest
+      try {
+        await this.notificationService.sendNotificationToAdmins(
+          'Đơn hàng mới đã được tạo bởi khách hàng',
+          `Đơn hàng ${orderCode} đã được tạo bởi khách hàng ${customerInfo.name}`,
+          'system',
+          {
+            userId: createdOrder._id.toString(),
+            action: 'order_guest_created'
+          },
+          true
+        );
+      } catch (error) {
+        console.error('Lỗi khi gửi thông báo cho admin:', error);
+      }
+      
       return populatedOrder;
     } catch (error) {
       // Log lỗi để debug
@@ -948,6 +1080,12 @@ export class OrdersService {
     if (order.status !== 'delivered') {
       for (const item of order.items) {
         try {
+          console.log(`[CANCEL_ORDER_ADMIN] Returning stock for item:`, {
+            productId: item.product._id.toString(),
+            variant: item.variant,
+            quantity: item.quantity
+          });
+          
           await this.productsService.returnStock(
             item.product._id.toString(),
             item.variant,
@@ -963,6 +1101,44 @@ export class OrdersService {
     // Cập nhật trạng thái đơn hàng thành cancelled
     order.status = 'cancelled';
     await order.save();
+
+    // Gửi thông báo cho admin khi đơn hàng bị hủy bởi admin
+    try {
+      await this.notificationService.sendNotificationToAdmins(
+        'Đơn hàng đã bị hủy bởi admin',
+        `Đơn hàng ${order.orderCode || order._id} đã bị hủy bởi admin`,
+        'system',
+        {
+          userId: order._id.toString(),
+          action: 'order_admin_cancelled'
+        },
+        true
+      );
+    } catch (error) {
+      console.error('Lỗi khi gửi thông báo hủy đơn hàng cho admin:', error);
+    }
+
+    // Gửi thông báo cho user khi đơn hàng bị hủy bởi admin
+    if (order.idUser) {
+      try {
+        const user = await this.userModel.findById(order.idUser);
+        if (user) {
+          await this.notificationService.sendAndSaveNotification(
+            order.idUser.toString(),
+            user.deviceId || null,
+            'Đơn hàng đã bị hủy bởi admin',
+            `Đơn hàng ${order.orderCode || order._id} đã bị hủy bởi admin`,
+            'order_admin_cancelled',
+            {
+              userId: order._id.toString(),
+              action: 'order_admin_cancelled'
+            }
+          );
+        }
+      } catch (error) {
+        console.error('Lỗi khi gửi thông báo hủy đơn hàng cho user:', error);
+      }
+    }
 
     return order;
   }
@@ -1523,47 +1699,19 @@ export class OrdersService {
       }
     }
 
-    // Tìm kiếm theo khoảng giá
-    if (minTotal || maxTotal) {
-      query.total = {};
-      if (minTotal !== undefined) {
-        query.total.$gte = minTotal;
-      }
-      if (maxTotal !== undefined) {
-        query.total.$lte = maxTotal;
-      }
-    }
-
-    // Tìm kiếm theo phương thức thanh toán
-    if (payment) {
-      query.payment = payment;
-    }
-
-    // Tìm kiếm theo mua tại cửa hàng
-    if (atStore !== undefined) {
-      query.atStore = atStore;
-    }
-
-    // Xây dựng sort object
-    let sortObject: any = {};
-    if (sortBy === SortField.CUSTOMER_NAME) {
-      sortObject['idUser.name'] = sortOrder === SortOrder.ASC ? 1 : -1;
-    } else {
-      sortObject[sortBy] = sortOrder === SortOrder.ASC ? 1 : -1;
-    }
-
-    // Thực hiện query với populate
-    const [data, total] = await Promise.all([
-      this.orderModel
-        .find(query)
-        .populate('idUser', 'name email')
-        .populate('items.product', 'name images price')
-        .sort(sortObject)
+    // Thực hiện tìm kiếm
+    const [data, totalResult] = await Promise.all([
+      this.orderModel.find(query)
+        .populate('idUser', 'name email phone')
+        .populate('items.product', 'name price images')
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .exec(),
-      this.orderModel.countDocuments(query),
+      this.orderModel.countDocuments(query)
     ]);
+
+    const total = totalResult;
 
     return {
       data: data as any,
@@ -1582,12 +1730,17 @@ export class OrdersService {
   ) {
     const query: any = {};
 
+    // Tìm kiếm theo trạng thái đơn hàng
     if (status) {
       query.status = status;
     }
+
+    // Tìm kiếm theo trạng thái thanh toán
     if (paymentStatus) {
       query.paymentStatus = paymentStatus;
     }
+
+    // Tìm kiếm theo khoảng thời gian
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) {
@@ -1598,41 +1751,45 @@ export class OrdersService {
       }
     }
 
-    const [totalOrders, totalAmount, statusBreakdown, paymentBreakdown] = await Promise.all([
-      this.orderModel.countDocuments(query),
-      this.orderModel.aggregate([
-        { $match: query },
-        { $group: { _id: null, total: { $sum: '$total' } } }
-      ]),
-      this.orderModel.aggregate([
-        { $match: query },
-        { $group: { _id: '$status', count: { $sum: 1 } } }
-      ]),
-      this.orderModel.aggregate([
-        { $match: query },
-        { $group: { _id: '$paymentStatus', count: { $sum: 1 } } }
-      ])
+    // Thống kê tổng quan
+    const totalOrders = await this.orderModel.countDocuments(query);
+    const totalAmount = await this.orderModel.aggregate([
+      { $match: query },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
     ]);
+
+    // Thống kê theo trạng thái
+    const statusBreakdown = await this.orderModel.aggregate([
+      { $match: query },
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
+
+    // Thống kê theo trạng thái thanh toán
+    const paymentBreakdown = await this.orderModel.aggregate([
+      { $match: query },
+      { $group: { _id: '$paymentStatus', count: { $sum: 1 } } }
+    ]);
+
+    // Chuyển đổi kết quả thành object
+    const statusStats = {};
+    statusBreakdown.forEach(item => {
+      statusStats[item._id] = item.count;
+    });
+
+    const paymentStats = {};
+    paymentBreakdown.forEach(item => {
+      paymentStats[item._id] = item.count;
+    });
 
     const totalAmountValue = totalAmount.length > 0 ? totalAmount[0].total : 0;
     const averageOrderValue = totalOrders > 0 ? totalAmountValue / totalOrders : 0;
-
-    const statusBreakdownObj = statusBreakdown.reduce((acc, item) => {
-      acc[item._id] = item.count;
-      return acc;
-    }, {});
-
-    const paymentBreakdownObj = paymentBreakdown.reduce((acc, item) => {
-      acc[item._id] = item.count;
-      return acc;
-    }, {});
 
     return {
       totalOrders,
       totalAmount: totalAmountValue,
       averageOrderValue: Math.round(averageOrderValue),
-      statusBreakdown: statusBreakdownObj,
-      paymentBreakdown: paymentBreakdownObj,
+      statusBreakdown: statusStats,
+      paymentBreakdown: paymentStats,
     };
   }
 }

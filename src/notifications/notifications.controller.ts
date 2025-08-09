@@ -358,4 +358,301 @@ export class NotificationController {
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
+
+  @Post('send-to-all-users')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Gửi thông báo cho tất cả người dùng (Admin only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['title', 'body'],
+      properties: {
+        title: { type: 'string', description: 'Tiêu đề thông báo' },
+        body: { type: 'string', description: 'Nội dung thông báo' },
+        type: {
+          type: 'string',
+          description: 'Loại thông báo',
+          enum: ['info', 'success', 'warning', 'error', 'promotion', 'order', 'system'],
+          default: 'system',
+        },
+        sendPush: { type: 'boolean', description: 'Có gửi push notification không', default: true },
+        excludeInactive: { type: 'boolean', description: 'Có loại trừ user không active không', default: true },
+        metadata: { type: 'object', description: 'Dữ liệu bổ sung' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Gửi thông báo cho tất cả người dùng thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        message: { type: 'string' },
+        totalUsers: { type: 'number' },
+        successCount: { type: 'number' },
+        errorCount: { type: 'number' },
+        results: { type: 'array' },
+      },
+    },
+  })
+  async sendNotificationToAllUsers(
+    @Body()
+    body: {
+      title: string;
+      body: string;
+      type?: string;
+      sendPush?: boolean;
+      excludeInactive?: boolean;
+      metadata?: any;
+    },
+  ) {
+    try {
+      const result = await this.notificationService.sendNotificationToAllUsers(
+        body.title,
+        body.body,
+        body.type || 'system',
+        body.metadata,
+        body.sendPush !== false, // Mặc định true
+        body.excludeInactive !== false, // Mặc định true
+      );
+
+      if (!result.success) {
+        throw new HttpException(result.message || result.error, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
+      return result;
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Post('send-urgent-to-all-users')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Gửi thông báo khẩn cấp cho tất cả người dùng (Admin only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['title', 'body'],
+      properties: {
+        title: { type: 'string', description: 'Tiêu đề thông báo khẩn cấp' },
+        body: { type: 'string', description: 'Nội dung thông báo khẩn cấp' },
+        metadata: { type: 'object', description: 'Dữ liệu bổ sung' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Gửi thông báo khẩn cấp thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        message: { type: 'string' },
+        totalUsers: { type: 'number' },
+        successCount: { type: 'number' },
+        errorCount: { type: 'number' },
+        results: { type: 'array' },
+      },
+    },
+  })
+  async sendUrgentNotificationToAllUsers(
+    @Body()
+    body: {
+      title: string;
+      body: string;
+      metadata?: any;
+    },
+  ) {
+    try {
+      const result = await this.notificationService.sendUrgentNotificationToAllUsers(
+        body.title,
+        body.body,
+        body.metadata,
+      );
+
+      if (!result.success) {
+        throw new HttpException(result.message || result.error, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
+      return result;
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Post('send-promotion-to-all-users')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Gửi thông báo khuyến mãi cho tất cả người dùng (Admin only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['title', 'body'],
+      properties: {
+        title: { type: 'string', description: 'Tiêu đề thông báo khuyến mãi' },
+        body: { type: 'string', description: 'Nội dung thông báo khuyến mãi' },
+        metadata: { type: 'object', description: 'Dữ liệu bổ sung' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Gửi thông báo khuyến mãi thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        message: { type: 'string' },
+        totalUsers: { type: 'number' },
+        successCount: { type: 'number' },
+        errorCount: { type: 'number' },
+        results: { type: 'array' },
+      },
+    },
+  })
+  async sendPromotionNotificationToAllUsers(
+    @Body()
+    body: {
+      title: string;
+      body: string;
+      metadata?: any;
+    },
+  ) {
+    try {
+      const result = await this.notificationService.sendPromotionNotificationToAllUsers(
+        body.title,
+        body.body,
+        body.metadata,
+      );
+
+      if (!result.success) {
+        throw new HttpException(result.message || result.error, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
+      return result;
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Post('send-to-admins')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Gửi thông báo cho tất cả admin (Admin only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['title', 'body'],
+      properties: {
+        title: { type: 'string', description: 'Tiêu đề thông báo' },
+        body: { type: 'string', description: 'Nội dung thông báo' },
+        type: {
+          type: 'string',
+          description: 'Loại thông báo',
+          enum: ['info', 'success', 'warning', 'error', 'system'],
+          default: 'system',
+        },
+        sendPush: { type: 'boolean', description: 'Có gửi push notification không', default: true },
+        roleId: { type: 'string', description: 'ID của role cụ thể (tùy chọn). Nếu không có sẽ gửi cho tất cả user có isAdmin = true' },
+        metadata: { type: 'object', description: 'Dữ liệu bổ sung' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Gửi thông báo cho admin thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        message: { type: 'string' },
+        totalAdmins: { type: 'number' },
+        results: { type: 'array' },
+      },
+    },
+  })
+  async sendNotificationToAdmins(
+    @Body()
+    body: {
+      title: string;
+      body: string;
+      type?: string;
+      sendPush?: boolean;
+      roleId?: string;
+      metadata?: any;
+    },
+  ) {
+    try {
+      const result = await this.notificationService.sendNotificationToAdmins(
+        body.title,
+        body.body,
+        body.type || 'system',
+        body.metadata,
+        body.sendPush !== false, // Mặc định true
+        body.roleId, // Truyền roleId nếu có
+      );
+
+      if (!result.success) {
+        throw new HttpException(result.message || result.error, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
+      return result;
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Post('send-urgent-to-admins')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Gửi thông báo khẩn cấp cho tất cả admin (Admin only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['title', 'body'],
+      properties: {
+        title: { type: 'string', description: 'Tiêu đề thông báo khẩn cấp' },
+        body: { type: 'string', description: 'Nội dung thông báo khẩn cấp' },
+        roleId: { type: 'string', description: 'ID của role cụ thể (tùy chọn). Nếu không có sẽ gửi cho tất cả user có isAdmin = true' },
+        metadata: { type: 'object', description: 'Dữ liệu bổ sung' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Gửi thông báo khẩn cấp cho admin thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        message: { type: 'string' },
+        totalAdmins: { type: 'number' },
+        results: { type: 'array' },
+      },
+    },
+  })
+  async sendUrgentNotificationToAdmins(
+    @Body()
+    body: {
+      title: string;
+      body: string;
+      roleId?: string;
+      metadata?: any;
+    },
+  ) {
+    try {
+      const result = await this.notificationService.sendUrgentNotificationToAdmins(
+        body.title,
+        body.body,
+        body.metadata,
+        body.roleId, // Truyền roleId nếu có
+      );
+
+      if (!result.success) {
+        throw new HttpException(result.message || result.error, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
+      return result;
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
 }

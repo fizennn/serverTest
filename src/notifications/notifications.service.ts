@@ -25,19 +25,22 @@ export class NotificationService {
     type: string = 'system',
     metadata?: any,
     sendPush: boolean = true,
+    roleId?: string, // Thêm parameter roleId tùy chọn
   ) {
     try {
-      const adminRoleIds = [
-        '6889ae1a4375cdf63deb4408',
-        '6889aefe4375cdf63deb44cb',
-      ];
+      let filter: any = { isActive: true }; // Chỉ gửi cho admin đang active
+      
+      if (roleId) {
+        // Nếu có roleId cụ thể, tìm theo roleId đó
+        filter.roleId = roleId;
+      } else {
+        // Nếu không có roleId, tìm tất cả user có isAdmin = true
+        filter.isAdmin = true;
+      }
 
-      // Tìm tất cả admin có roleId trong danh sách
+      // Tìm tất cả admin theo filter
       const admins = await this.userModel
-        .find({
-          roleId: { $in: adminRoleIds },
-          isActive: true, // Chỉ gửi cho admin đang active
-        })
+        .find(filter)
         .select('_id deviceId name email')
         .exec();
 
@@ -93,6 +96,7 @@ export class NotificationService {
     title: string,
     body: string,
     metadata?: any,
+    roleId?: string, // Thêm parameter roleId tùy chọn
   ) {
     return this.sendNotificationToAdmins(
       `🚨 ${title}`, // Thêm emoji để highlight
@@ -104,6 +108,7 @@ export class NotificationService {
         priority: 'high',
       },
       true, // Bắt buộc gửi push
+      roleId, // Truyền roleId nếu có
     );
   }
   // Hàm gốc của bạn
@@ -333,5 +338,136 @@ export class NotificationService {
       console.error('Get unread count error:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  // Gửi thông báo cho tất cả người dùng
+  async sendNotificationToAllUsers(
+    title: string,
+    body: string,
+    type: string = 'system',
+    metadata?: any,
+    sendPush: boolean = true,
+    excludeInactive: boolean = true,
+  ) {
+    try {
+      // Tìm tất cả user đang active (nếu excludeInactive = true)
+      const filter: any = {};
+      if (excludeInactive) {
+        filter.isActive = true;
+      }
+
+      const users = await this.userModel
+        .find(filter)
+        .select('_id deviceId name email isActive')
+        .exec();
+
+      if (users.length === 0) {
+        return {
+          success: false,
+          message: 'Không tìm thấy người dùng nào',
+        };
+      }
+
+      const results = [];
+      let successCount = 0;
+      let errorCount = 0;
+
+      // Gửi thông báo cho từng user
+      for (const user of users) {
+        try {
+          const result = await this.sendAndSaveNotification(
+            user._id.toString(),
+            sendPush ? user.deviceId : null, // Chỉ gửi push nếu sendPush = true
+            title,
+            body,
+            type,
+            {
+              ...metadata,
+              targetType: 'all_users',
+              userName: user.name,
+              userEmail: user.email,
+            },
+          );
+
+          if (result.success) {
+            successCount++;
+          } else {
+            errorCount++;
+          }
+
+          results.push({
+            userId: user._id.toString(),
+            userName: user.name,
+            userEmail: user.email,
+            isActive: user.isActive,
+            result,
+          });
+        } catch (error) {
+          errorCount++;
+          results.push({
+            userId: user._id.toString(),
+            userName: user.name,
+            userEmail: user.email,
+            isActive: user.isActive,
+            result: { success: false, error: error.message },
+          });
+        }
+      }
+
+      return {
+        success: true,
+        message: `Đã gửi thông báo cho ${users.length} người dùng`,
+        totalUsers: users.length,
+        successCount,
+        errorCount,
+        results,
+      };
+    } catch (error) {
+      console.error('Send notification to all users error:', error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // Gửi thông báo khẩn cấp cho tất cả người dùng
+  async sendUrgentNotificationToAllUsers(
+    title: string,
+    body: string,
+    metadata?: any,
+  ) {
+    return this.sendNotificationToAllUsers(
+      `🚨 ${title}`, // Thêm emoji để highlight
+      body,
+      'error',
+      {
+        ...metadata,
+        urgent: true,
+        priority: 'high',
+      },
+      true, // Bắt buộc gửi push
+      false, // Gửi cho cả user không active
+    );
+  }
+
+  // Gửi thông báo khuyến mãi cho tất cả người dùng
+  async sendPromotionNotificationToAllUsers(
+    title: string,
+    body: string,
+    metadata?: any,
+    ) {
+    return this.sendNotificationToAllUsers(
+      `🎉 ${title}`, // Thêm emoji để highlight
+      body,
+      'promotion',
+      {
+        ...metadata,
+        promotion: true,
+        priority: 'normal',
+      },
+      true, // Gửi push notification
+      true, // Chỉ gửi cho user active
+    );
   }
 }

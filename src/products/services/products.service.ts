@@ -609,30 +609,48 @@ export class ProductsService {
       throw new NotFoundException('Product not found');
     }
 
-    // Tìm variant theo màu sắc
-    const variant = product.variants.find(v => v.color === variantName);
+    console.log(`[RETURN_STOCK] Attempting to return stock for product: ${product.name}, variant: ${variantName}, quantity: ${quantity}`);
+    console.log(`[RETURN_STOCK] Available variants:`, product.variants.map(v => ({ color: v.color, sizes: v.sizes.length })));
+
+    // Tìm variant theo màu sắc - thử nhiều cách khác nhau
+    let variant = product.variants.find(v => v.color === variantName);
+    
+    // Nếu không tìm thấy, thử tìm kiếm không phân biệt hoa thường
     if (!variant) {
-      throw new NotFoundException('Variant not found');
+      variant = product.variants.find(v => v.color.toLowerCase() === variantName.toLowerCase());
     }
+    
+    // Nếu vẫn không tìm thấy, thử tìm kiếm partial match
+    if (!variant) {
+      variant = product.variants.find(v => 
+        v.color.toLowerCase().includes(variantName.toLowerCase()) || 
+        variantName.toLowerCase().includes(v.color.toLowerCase())
+      );
+    }
+
+    if (!variant) {
+      console.error(`[RETURN_STOCK] Variant not found for product: ${product.name}, variant: ${variantName}`);
+      console.error(`[RETURN_STOCK] Available variants:`, product.variants.map(v => v.color));
+      throw new NotFoundException(`Variant '${variantName}' not found for product '${product.name}'. Available variants: ${product.variants.map(v => v.color).join(', ')}`);
+    }
+
+    console.log(`[RETURN_STOCK] Found variant: ${variant.color}, updating stock...`);
 
     // Cập nhật stock cho tất cả sizes trong variant
     variant.sizes.forEach(size => {
+      const oldStock = size.stock;
       size.stock += quantity;
+      console.log(`[RETURN_STOCK] Size ${size.size}: ${oldStock} -> ${size.stock} (+${quantity})`);
     });
 
     // Cập nhật tổng stock của sản phẩm
+    const oldTotalStock = product.countInStock;
     product.countInStock = this.calculateTotalStock(product.variants);
-    await this.notificationService.sendNotificationToAdmins(
-      'Hoàn trả kho hàng',
-      `Sản phẩm "${product.name}" (${variantName}) đã được hoàn trả ${quantity} sản phẩm vào kho`,
-      'info',
-      {
-        action: 'return_stock',
-        productId: product._id.toString(),
-        productName: product.name,
-        returnedQuantity: quantity,
-      },
-    );
+    console.log(`[RETURN_STOCK] Total stock: ${oldTotalStock} -> ${product.countInStock}`);
+
+
+
     await product.save();
+    console.log(`[RETURN_STOCK] Stock return completed successfully for product: ${product.name}`);
   }
 }
