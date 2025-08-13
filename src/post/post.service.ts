@@ -11,6 +11,7 @@ import {
   UpdateCommentDto,
   PostQueryDto 
 } from './dto/post.dto';
+import { NotificationService } from '@/notifications/notifications.service';
 
 @Injectable()
 export class PostsService {
@@ -18,6 +19,7 @@ export class PostsService {
     @InjectModel(Post.name) private postModel: Model<PostDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
+    private notificationService: NotificationService,
   ) {}
 
   // ============ POST CRUD OPERATIONS ============
@@ -51,7 +53,22 @@ export class PostsService {
       comments: []
     });
 
-    return post.save();
+    const createdPost = await post.save();
+
+    // Gửi thông báo cho tất cả người dùng khi admin tạo bài viết mới
+    await this.notificationService.sendNotificationToAllUsers(
+      'Bài viết mới',
+      `Có bài viết mới: ${createPostDto.title}`,
+      'promotion',
+      {
+        type: 'post',
+        postId: createdPost._id.toString(),
+        action: 'created',
+        title: createPostDto.title
+      }
+    );
+
+    return createdPost;
   }
 
   async findAll(query: PostQueryDto): Promise<any> {

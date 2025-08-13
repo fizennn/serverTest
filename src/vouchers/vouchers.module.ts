@@ -4,6 +4,7 @@ import { VouchersController } from './controller/vouchers.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Voucher, VoucherSchema } from './schemas/voucher.schema';
 import { UsersModule } from '@/users/users.module';
+import { NotificationModule } from '@/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { UsersModule } from '@/users/users.module';
       },
     ]),
     forwardRef(() => UsersModule),
+    NotificationModule,
   ],
   providers: [VouchersService],
   controllers: [VouchersController],

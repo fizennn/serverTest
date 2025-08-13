@@ -6,6 +6,7 @@ import { ReturnOrder, ReturnOrderSchema } from './schemas/return-order.schema';
 import { Order, OrderSchema } from '@/orders/schemas/order.schema';
 import { Product, ProductSchema } from '@/products/schemas/product.schema';
 import { User, UserSchema } from '@/users/schemas/user.schema';
+import { NotificationModule } from '@/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { User, UserSchema } from '@/users/schemas/user.schema';
       { name: Product.name, schema: ProductSchema },
       { name: User.name, schema: UserSchema },
     ]),
+    NotificationModule,
   ],
   controllers: [ReturnOrdersController],
   providers: [ReturnOrdersService],

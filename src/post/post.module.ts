@@ -5,6 +5,7 @@ import { PostsController } from './post.controller';
 import { Post, PostSchema } from './schemas/post.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Product, ProductSchema } from '../products/schemas/product.schema';
+import { NotificationModule } from '@/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { Product, ProductSchema } from '../products/schemas/product.schema';
       { name: User.name, schema: UserSchema },
       { name: Product.name, schema: ProductSchema },
     ]),
+    NotificationModule,
   ],
   controllers: [PostsController],
   providers: [PostsService],

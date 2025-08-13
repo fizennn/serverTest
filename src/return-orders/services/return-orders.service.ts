@@ -17,6 +17,7 @@ import {
 import { Order, OrderWithTimestamps } from '@/orders/schemas/order.schema';
 import { Product } from '@/products/schemas/product.schema';
 import { User } from '@/users/schemas/user.schema';
+import { NotificationService } from '@/notifications/notifications.service';
 
 @Injectable()
 export class ReturnOrdersService {
@@ -25,6 +26,7 @@ export class ReturnOrdersService {
     @InjectModel(Order.name) private orderModel: Model<Order>,
     @InjectModel(Product.name) private productModel: Model<Product>,
     @InjectModel(User.name) private userModel: Model<User>,
+    private notificationService: NotificationService,
   ) {}
 
   async createReturnRequest(
@@ -158,6 +160,33 @@ export class ReturnOrdersService {
       .populate('customerId', 'name email')
       .populate('items.productId', 'name images')
       .exec();
+
+    // Gửi thông báo cho user và admin khi tạo yêu cầu trả hàng
+    await this.notificationService.sendAndSaveNotification(
+      userId,
+      null, // pushToken - sẽ được lấy từ user trong service
+      'Yêu cầu trả hàng',
+      `Yêu cầu trả hàng cho đơn hàng ${order._id} đã được tạo thành công`,
+      'info',
+      {
+        type: 'return-order',
+        returnOrderId: populatedReturn._id.toString(),
+        orderId: order._id.toString(),
+        action: 'created'
+      }
+    );
+
+    await this.notificationService.sendNotificationToAdmins(
+      'Yêu cầu trả hàng mới',
+      `Có yêu cầu trả hàng mới cho đơn hàng ${order._id}`,
+      'info',
+      {
+        type: 'return-order',
+        returnOrderId: populatedReturn._id.toString(),
+        orderId: order._id.toString(),
+        action: 'created'
+      }
+    );
 
     return populatedReturn;
   }
@@ -393,6 +422,44 @@ export class ReturnOrdersService {
       .populate('customerId', 'name email')
       .populate('items.productId', 'name images')
       .exec();
+
+    // Gửi thông báo cho user và admin khi admin cập nhật trạng thái trả hàng
+    const statusMessages = {
+      'approved': 'Yêu cầu trả hàng đã được chấp nhận',
+      'processing': 'Yêu cầu trả hàng đang được xử lý',
+      'completed': 'Yêu cầu trả hàng đã hoàn thành',
+      'rejected': 'Yêu cầu trả hàng đã bị từ chối'
+    };
+
+    const message = statusMessages[updateData.status] || `Trạng thái yêu cầu trả hàng đã được cập nhật thành ${updateData.status}`;
+
+    await this.notificationService.sendAndSaveNotification(
+      returnRequest.customerId.toString(),
+      null, // pushToken - sẽ được lấy từ user trong service
+      'Cập nhật trạng thái trả hàng',
+      `${message} cho đơn hàng ${order._id}`,
+      'info',
+      {
+        type: 'return-order',
+        returnOrderId: returnRequest._id.toString(),
+        orderId: order._id.toString(),
+        action: 'status-updated',
+        status: updateData.status
+      }
+    );
+
+    await this.notificationService.sendNotificationToAdmins(
+      'Cập nhật trạng thái trả hàng',
+      `Trạng thái yêu cầu trả hàng ${returnRequest._id} đã được cập nhật thành ${updateData.status}`,
+      'info',
+      {
+        type: 'return-order',
+        returnOrderId: returnRequest._id.toString(),
+        orderId: order._id.toString(),
+        action: 'status-updated',
+        status: updateData.status
+      }
+    );
 
     return populatedReturn;
   }

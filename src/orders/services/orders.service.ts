@@ -96,7 +96,7 @@ export class OrdersService {
     try {
       await this.notificationService.sendNotificationToAdmins(
         'Đơn hàng đã bị hủy',
-        `Đơn hàng ${order.orderCode || order._id} đã bị hủy bởi người dùng`,
+        `Đơn hàng ${order._id} đã bị hủy bởi người dùng`,
         'system',
         {
           userId: order._id.toString(),
@@ -116,7 +116,7 @@ export class OrdersService {
           userId,
           user.deviceId || null,
           'Đơn hàng đã được hủy',
-          `Đơn hàng ${order.orderCode || order._id} đã được hủy thành công`,
+          `Đơn hàng ${order._id} đã được hủy thành công`,
           'order_cancelled',
           {
             userId: order._id.toString(),
@@ -367,7 +367,7 @@ export class OrdersService {
       try {
         await this.notificationService.sendNotificationToAdmins(
           'Đơn hàng mới đã được tạo',
-          `Đơn hàng ${orderCode} đã được tạo`,
+          `Đơn hàng ${createdOrder._id} đã được tạo`,
           'system',
           {
             userId: createdOrder._id.toString(),
@@ -385,7 +385,7 @@ export class OrdersService {
           userId,
           user.deviceId || null,
           'Đơn hàng đã được tạo thành công',
-          `Đơn hàng ${orderCode} đã được tạo thành công`,
+          `Đơn hàng ${createdOrder._id} đã được tạo thành công`,
           'order',
           {
             userId: createdOrder._id.toString(),
@@ -630,7 +630,7 @@ export class OrdersService {
       try {
         await this.notificationService.sendNotificationToAdmins(
           'Đơn hàng mới đã được tạo bởi admin',
-          `Đơn hàng ${orderCode} đã được tạo bởi admin`,
+          `Đơn hàng ${createdOrder._id} đã được tạo bởi admin`,
           'system',
           {
             userId: createdOrder._id.toString(),
@@ -650,7 +650,7 @@ export class OrdersService {
             userId,
             user.deviceId || null,
             'Đơn hàng đã được tạo thành công',
-            `Đơn hàng ${orderCode} đã được tạo thành công bởi admin`,
+            `Đơn hàng ${createdOrder._id} đã được tạo thành công bởi admin`,
             'order_admin_created',
             {
               userId: createdOrder._id.toString(),
@@ -896,7 +896,7 @@ export class OrdersService {
       try {
         await this.notificationService.sendNotificationToAdmins(
           'Đơn hàng mới đã được tạo bởi khách hàng',
-          `Đơn hàng ${orderCode} đã được tạo bởi khách hàng ${customerInfo.name}`,
+          `Đơn hàng ${createdOrder._id} đã được tạo bởi khách hàng ${customerInfo.name}`,
           'system',
           {
             userId: createdOrder._id.toString(),
@@ -967,6 +967,9 @@ export class OrdersService {
 
     if (!order) throw new NotFoundException('No order with given ID.');
 
+    const oldStatus = order.status;
+    const oldNote = order.note;
+
     if (updateData.status) {
       order.status = updateData.status;
     }
@@ -992,6 +995,66 @@ export class OrdersService {
     }
 
     const updatedOrder = await order.save();
+
+    // Gửi thông báo cho user khi có thay đổi trạng thái hoặc ghi chú
+    if (oldStatus !== order.status || oldNote !== order.note) {
+      try {
+        // Lấy thông tin user
+        const user = await this.userModel.findById(order.idUser);
+        if (user) {
+          let title = 'Đơn hàng đã được cập nhật';
+          let body = `Đơn hàng ${order._id}`;
+
+          if (oldStatus !== order.status) {
+            body += ` đã chuyển từ trạng thái "${oldStatus}" sang "${order.status}"`;
+          }
+
+          if (oldNote !== order.note && order.note) {
+            body += `. Ghi chú: ${order.note}`;
+          }
+
+          await this.notificationService.sendAndSaveNotification(
+            order.idUser.toString(),
+            user.deviceId || null,
+            title,
+            body,
+            'order',
+            {
+              userId: order._id.toString(),
+              action: 'order_updated'
+            }
+          );
+        }
+      } catch (error) {
+        console.error('Lỗi khi gửi thông báo cập nhật đơn hàng:', error);
+      }
+
+      // Gửi thông báo cho tất cả admin
+      try {
+        let adminTitle = 'Đơn hàng đã được cập nhật';
+        let adminBody = `Đơn hàng ${order._id}`;
+        
+        if (oldStatus !== order.status) {
+          adminBody += ` đã chuyển từ trạng thái "${oldStatus}" sang "${order.status}"`;
+        }
+        
+        if (oldNote !== order.note && order.note) {
+          adminBody += `. Ghi chú: ${order.note}`;
+        }
+
+        await this.notificationService.sendNotificationToAdmins(
+          adminTitle,
+          adminBody,
+          'order_updated',
+          {
+            userId: order._id.toString(),
+            action: 'order_updated'
+          }
+        );
+      } catch (error) {
+        console.error('Lỗi khi gửi thông báo cập nhật đơn hàng cho admin:', error);
+      }
+    }
 
     return updatedOrder;
   }
@@ -1026,6 +1089,41 @@ export class OrdersService {
       }
 
       await order.save();
+
+      // Gửi thông báo cho user khi đơn hàng được giao thành công
+      try {
+        const user = await this.userModel.findById(order.idUser);
+        if (user) {
+          await this.notificationService.sendAndSaveNotification(
+            order.idUser.toString(),
+            user.deviceId || null,
+            'Đơn hàng đã được giao thành công',
+            `Đơn hàng ${order._id} đã được giao thành công. Cảm ơn bạn đã mua hàng!`,
+            'order',
+            {
+              userId: order._id.toString(),
+              action: 'order_delivered'
+            }
+          );
+        }
+      } catch (error) {
+        console.error('Lỗi khi gửi thông báo giao hàng thành công:', error);
+      }
+
+      // Gửi thông báo cho tất cả admin
+      try {
+        await this.notificationService.sendNotificationToAdmins(
+          'Đơn hàng đã được giao thành công',
+          `Đơn hàng ${order._id} đã được giao thành công cho khách hàng.`,
+          'order_delivered',
+          {
+            userId: order._id.toString(),
+            action: 'order_delivered'
+          }
+        );
+      } catch (error) {
+        console.error('Lỗi khi gửi thông báo giao hàng thành công cho admin:', error);
+      }
 
       this.logger.log(`[UPDATE_TO_DELIVERED] Success - OrderId: ${id}, New status: delivered, New payment status: ${order.paymentStatus}`);
       return order;
@@ -1106,7 +1204,7 @@ export class OrdersService {
     try {
       await this.notificationService.sendNotificationToAdmins(
         'Đơn hàng đã bị hủy bởi admin',
-        `Đơn hàng ${order.orderCode || order._id} đã bị hủy bởi admin`,
+        `Đơn hàng ${order._id} đã bị hủy bởi admin`,
         'system',
         {
           userId: order._id.toString(),
@@ -1127,7 +1225,7 @@ export class OrdersService {
             order.idUser.toString(),
             user.deviceId || null,
             'Đơn hàng đã bị hủy bởi admin',
-            `Đơn hàng ${order.orderCode || order._id} đã bị hủy bởi admin`,
+            `Đơn hàng ${order._id} đã bị hủy bởi admin`,
             'order_admin_cancelled',
             {
               userId: order._id.toString(),
@@ -1155,8 +1253,104 @@ export class OrdersService {
 
       this.logger.log(`[UPDATE_PAYMENT_STATUS] Order found - Current payment status: ${order.paymentStatus}`);
 
+      const oldPaymentStatus = order.paymentStatus;
       order.paymentStatus = paymentStatus;
       await order.save();
+
+      // Gửi thông báo cho user khi trạng thái thanh toán thay đổi
+      if (oldPaymentStatus !== paymentStatus) {
+        try {
+          const user = await this.userModel.findById(order.idUser);
+          if (user) {
+            let title = 'Trạng thái thanh toán đã được cập nhật';
+            let body = `Đơn hàng ${order._id}: `;
+
+            switch (paymentStatus) {
+              case 'paid':
+                body += 'Thanh toán đã được xác nhận';
+                break;
+              case 'unpaid':
+                body += 'Đang chờ thanh toán';
+                break;
+              case 'refunded':
+                body += 'Đã hoàn tiền';
+                break;
+              case 'cancelled':
+                body += 'Thanh toán đã bị hủy';
+                break;
+              case 'expired':
+                body += 'Phiếu thanh toán đã hết hạn';
+                break;
+              case 'failed':
+                body += 'Thanh toán thất bại';
+                break;
+              case 'pending':
+                body += 'Đang xử lý thanh toán';
+                break;
+              default:
+                body += `Trạng thái thanh toán: ${paymentStatus}`;
+            }
+
+            await this.notificationService.sendAndSaveNotification(
+              order.idUser.toString(),
+              user.deviceId || null,
+              title,
+              body,
+              'order',
+              {
+                userId: order._id.toString(),
+                action: 'payment_status_updated'
+              }
+            );
+          }
+        } catch (error) {
+          console.error('Lỗi khi gửi thông báo cập nhật trạng thái thanh toán:', error);
+        }
+
+        // Gửi thông báo cho tất cả admin
+        try {
+          let adminTitle = 'Trạng thái thanh toán đã được cập nhật';
+          let adminBody = `Đơn hàng ${order._id}: `;
+          
+          switch (paymentStatus) {
+            case 'paid':
+              adminBody += 'Thanh toán đã được xác nhận';
+              break;
+            case 'unpaid':
+              adminBody += 'Đang chờ thanh toán';
+              break;
+            case 'refunded':
+              adminBody += 'Đã hoàn tiền';
+              break;
+            case 'cancelled':
+              adminBody += 'Thanh toán đã bị hủy';
+              break;
+            case 'expired':
+              adminBody += 'Phiếu thanh toán đã hết hạn';
+              break;
+            case 'failed':
+              adminBody += 'Thanh toán thất bại';
+              break;
+            case 'pending':
+              adminBody += 'Đang xử lý thanh toán';
+              break;
+            default:
+              adminBody += `Trạng thái thanh toán: ${paymentStatus}`;
+          }
+
+          await this.notificationService.sendNotificationToAdmins(
+            adminTitle,
+            adminBody,
+            'payment_status_updated',
+            {
+              userId: order._id.toString(),
+              action: 'payment_status_updated'
+            }
+          );
+        } catch (error) {
+          console.error('Lỗi khi gửi thông báo cập nhật trạng thái thanh toán cho admin:', error);
+        }
+      }
 
       this.logger.log(`[UPDATE_PAYMENT_STATUS] Success - OrderId: ${id}, New payment status: ${paymentStatus}`);
       return { message: 'Cập nhật trạng thái thanh toán thành công', paymentStatus };
@@ -1178,8 +1372,80 @@ export class OrdersService {
 
       this.logger.log(`[UPDATE_PAYMENT_STATUS_BY_ORDER_CODE] Order found - OrderId: ${order._id}, Current payment status: ${order.paymentStatus}`);
 
+      const oldPaymentStatus = order.paymentStatus;
       order.paymentStatus = paymentStatus;
       await order.save();
+
+      // Gửi thông báo cho user khi trạng thái thanh toán thay đổi
+      if (oldPaymentStatus !== paymentStatus) {
+        try {
+          const user = await this.userModel.findById(order.idUser);
+          if (user) {
+            let title = 'Trạng thái thanh toán đã được cập nhật';
+            let body = `Đơn hàng ${order._id}: `;
+
+            switch (paymentStatus) {
+              case 'paid':
+                body += 'Thanh toán đã được xác nhận';
+                break;
+              case 'unpaid':
+                body += 'Đang chờ thanh toán';
+                break;
+              case 'refunded':
+                body += 'Đã hoàn tiền';
+                break;
+              default:
+                body += `Trạng thái thanh toán: ${paymentStatus}`;
+            }
+
+            await this.notificationService.sendAndSaveNotification(
+              order.idUser.toString(),
+              user.deviceId || null,
+              title,
+              body,
+              'order',
+              {
+                userId: order._id.toString(),
+                action: 'payment_status_updated'
+              }
+            );
+          }
+        } catch (error) {
+          console.error('Lỗi khi gửi thông báo cập nhật trạng thái thanh toán:', error);
+        }
+
+        // Gửi thông báo cho tất cả admin
+        try {
+          let adminTitle = 'Trạng thái thanh toán đã được cập nhật';
+          let adminBody = `Đơn hàng ${order._id}: `;
+          
+          switch (paymentStatus) {
+            case 'paid':
+              adminBody += 'Thanh toán đã được xác nhận';
+              break;
+            case 'unpaid':
+              adminBody += 'Đang chờ thanh toán';
+              break;
+            case 'refunded':
+              adminBody += 'Đã hoàn tiền';
+              break;
+            default:
+              adminBody += `Trạng thái thanh toán: ${paymentStatus}`;
+          }
+
+          await this.notificationService.sendNotificationToAdmins(
+            adminTitle,
+            adminBody,
+            'payment_status_updated',
+            {
+              userId: order._id.toString(),
+              action: 'payment_status_updated'
+            }
+          );
+        } catch (error) {
+          console.error('Lỗi khi gửi thông báo cập nhật trạng thái thanh toán cho admin:', error);
+        }
+      }
 
       this.logger.log(`[UPDATE_PAYMENT_STATUS_BY_ORDER_CODE] Success - OrderCode: ${orderCode}, New payment status: ${paymentStatus}`);
       return { 

@@ -148,6 +148,7 @@ export class NotificationController {
   }
 
   @Get('unread-count')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Đếm số thông báo chưa đọc' })
   @ApiResponse({
     status: 200,
@@ -181,6 +182,7 @@ export class NotificationController {
   }
 
   @Put(':id/read')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Đánh dấu thông báo đã đọc' })
   @ApiResponse({
     status: 200,
@@ -229,6 +231,7 @@ export class NotificationController {
   }
 
   @Put('mark-all-read')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Đánh dấu tất cả thông báo đã đọc' })
   @ApiResponse({
     status: 200,
@@ -261,6 +264,7 @@ export class NotificationController {
   }
 
   @Post('send-and-save')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Gửi và lưu thông báo (dành cho admin/system)' })
   @ApiBody({
     schema: {

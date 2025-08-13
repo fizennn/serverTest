@@ -3,11 +3,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Voucher, VoucherDocument } from '../schemas/voucher.schema';
 import { CreateVoucherDto, UpdateVoucherDto } from '../dtos/voucher.dto';
+import { NotificationService } from '@/notifications/notifications.service';
 
 @Injectable()
 export class VouchersService {
   constructor(
     @InjectModel(Voucher.name) private voucherModel: Model<VoucherDocument>,
+    private notificationService: NotificationService,
   ) {}
 
   async create(createVoucherDto: CreateVoucherDto): Promise<Voucher> {
@@ -23,7 +25,23 @@ export class VouchersService {
     };
     
     const voucher = new this.voucherModel(voucherData);
-    return await voucher.save();
+    const createdVoucher = await voucher.save();
+
+    // Gửi thông báo cho tất cả người dùng khi admin tạo voucher mới
+    await this.notificationService.sendNotificationToAllUsers(
+      'Voucher mới',
+      `Có voucher mới: Giảm ${createVoucherDto.disCount}% cho ${createVoucherDto.type === 'item' ? 'sản phẩm' : 'vận chuyển'}`,
+      'promotion',
+      {
+        type: 'voucher',
+        voucherId: createdVoucher._id.toString(),
+        action: 'created',
+        voucherType: createVoucherDto.type,
+        discount: createVoucherDto.disCount
+      }
+    );
+
+    return createdVoucher;
   }
 
   async findAll(page: number = 1, limit: number = 10): Promise<{ data: Voucher[], total: number, pages: number }> {
