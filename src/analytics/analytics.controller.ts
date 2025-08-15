@@ -16,6 +16,7 @@ import {
   PaymentMethodStatsDto,
   VoucherUsageDto,
   DateRangeQueryDto,
+  DashboardStatsDto,
 } from './dto/analytics.dto';
 import { AdminGuard } from '@/guards/admin.guard';
 import { AnalyticsService } from './analytics.service';
@@ -26,6 +27,21 @@ import { AnalyticsService } from './analytics.service';
 @UseGuards(AdminGuard)
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
+
+  @Get('dashboard')
+  @ApiOperation({
+    summary: 'Thống kê trang chủ',
+    description: 'Lấy tất cả thống kê cần thiết cho trang chủ admin bao gồm: doanh thu hôm nay/hôm qua/tháng này/tháng trước, số đơn hàng theo trạng thái, doanh thu theo tháng, top sản phẩm bán chạy',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy thống kê trang chủ thành công',
+    type: DashboardStatsDto,
+  })
+  @ApiResponse({ status: 403, description: 'Chỉ admin mới có quyền truy cập' })
+  async getDashboardStats(): Promise<DashboardStatsDto> {
+    return this.analyticsService.getDashboardStats();
+  }
 
   @Get('overview')
   @ApiOperation({

@@ -181,3 +181,100 @@ export class VoucherUsageDto {
   @ApiProperty({ description: 'Doanh thu từ đơn có voucher (VNĐ)', example: 15000000 })
   revenueFromVoucherOrders: number;
 }
+
+export class DashboardStatsDto {
+  @ApiProperty({ 
+    description: 'Thống kê đơn hàng hôm nay',
+    example: {
+      totalRevenue: 15000000,
+      cashPayment: 8000000,
+      bankTransfer: 7000000
+    }
+  })
+  todayStats: {
+    totalRevenue: number;
+    cashPayment: number;
+    bankTransfer: number;
+  };
+
+  @ApiProperty({ 
+    description: 'Thống kê đơn hàng hôm qua',
+    example: {
+      totalRevenue: 12000000,
+      cashPayment: 6000000,
+      bankTransfer: 6000000
+    }
+  })
+  yesterdayStats: {
+    totalRevenue: number;
+    cashPayment: number;
+    bankTransfer: number;
+  };
+
+  @ApiProperty({ 
+    description: 'Thống kê đơn hàng tháng này',
+    example: {
+      totalRevenue: 450000000,
+      cashPayment: 230000000,
+      bankTransfer: 220000000
+    }
+  })
+  thisMonthStats: {
+    totalRevenue: number;
+    cashPayment: number;
+    bankTransfer: number;
+  };
+
+  @ApiProperty({ 
+    description: 'Thống kê đơn hàng tháng trước',
+    example: {
+      totalRevenue: 380000000,
+      cashPayment: 190000000,
+      bankTransfer: 190000000
+    }
+  })
+  lastMonthStats: {
+    totalRevenue: number;
+    cashPayment: number;
+    bankTransfer: number;
+  };
+
+  @ApiProperty({ description: 'Tổng số đơn hàng từ trước đến nay', example: 1250 })
+  totalOrders: number;
+
+  @ApiProperty({ description: 'Tổng số đơn chờ xử lý', example: 25 })
+  pendingOrders: number;
+
+  @ApiProperty({ description: 'Tổng số đơn đang xử lý', example: 15 })
+  processingOrders: number;
+
+  @ApiProperty({ description: 'Tổng số đơn đã giao', example: 980 })
+  deliveredOrders: number;
+
+  @ApiProperty({ 
+    description: 'Doanh thu theo tháng trong năm',
+    example: {
+      '1': 45000000,
+      '2': 52000000,
+      '3': 48000000,
+      '4': 55000000,
+      '5': 60000000,
+      '6': 58000000,
+      '7': 62000000,
+      '8': 65000000,
+      '9': 68000000,
+      '10': 72000000,
+      '11': 75000000,
+      '12': 80000000
+    }
+  })
+  monthlyRevenue: {
+    [key: string]: number;
+  };
+
+  @ApiProperty({ 
+    description: 'Top sản phẩm bán chạy nhất',
+    type: [TopProductDto]
+  })
+  topProducts: TopProductDto[];
+}

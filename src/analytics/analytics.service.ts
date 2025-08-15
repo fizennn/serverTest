@@ -12,6 +12,7 @@ import {
   PaymentMethodStatsDto,
   VoucherUsageDto,
   DateRangeQueryDto,
+  DashboardStatsDto,
 } from './dto/analytics.dto';
 import { Order } from '@/orders/schemas/order.schema';
 import { Product } from '@/products/schemas/product.schema';
@@ -432,5 +433,216 @@ export class AnalyticsService {
       }
     }
     return filter;
+  }
+
+  async getDashboardStats(): Promise<DashboardStatsDto> {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+
+    // Thống kê hôm nay
+    const todayStats = await this.getDailyStats(today);
+    
+    // Thống kê hôm qua
+    const yesterdayStats = await this.getDailyStats(yesterday);
+    
+    // Thống kê tháng này
+    const thisMonthStats = await this.getMonthlyStats(thisMonth, today);
+    
+    // Thống kê tháng trước
+    const lastMonthStats = await this.getMonthlyStats(lastMonth, lastMonthEnd);
+
+    // Tổng số đơn hàng theo trạng thái
+    const orderStatusCounts = await this.getOrderStatusCounts();
+
+    // Doanh thu theo tháng trong năm
+    const monthlyRevenue = await this.getMonthlyRevenueByYear(today.getFullYear());
+
+    // Top sản phẩm bán chạy
+    const topProducts = await this.getTopProducts(5);
+
+    return {
+      todayStats,
+      yesterdayStats,
+      thisMonthStats,
+      lastMonthStats,
+      totalOrders: orderStatusCounts.totalOrders,
+      pendingOrders: orderStatusCounts.pendingOrders,
+      processingOrders: orderStatusCounts.processingOrders,
+      deliveredOrders: orderStatusCounts.deliveredOrders,
+      monthlyRevenue,
+      topProducts,
+    };
+  }
+
+  private async getDailyStats(date: Date): Promise<{
+    totalRevenue: number;
+    cashPayment: number;
+    bankTransfer: number;
+  }> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const stats = await this.orderModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startOfDay, $lte: endOfDay },
+          status: 'delivered',
+        },
+      },
+      {
+        $group: {
+          _id: '$payment',
+          revenue: { $sum: '$total' },
+        },
+      },
+    ]);
+
+    let totalRevenue = 0;
+    let cashPayment = 0;
+    let bankTransfer = 0;
+
+    stats.forEach(stat => {
+      totalRevenue += stat.revenue;
+      if (stat._id === 'COD') {
+        cashPayment = stat.revenue;
+      } else {
+        bankTransfer += stat.revenue;
+      }
+    });
+
+    return {
+      totalRevenue,
+      cashPayment,
+      bankTransfer,
+    };
+  }
+
+  private async getMonthlyStats(startDate: Date, endDate: Date): Promise<{
+    totalRevenue: number;
+    cashPayment: number;
+    bankTransfer: number;
+  }> {
+    const stats = await this.orderModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startDate, $lte: endDate },
+          status: 'delivered',
+        },
+      },
+      {
+        $group: {
+          _id: '$payment',
+          revenue: { $sum: '$total' },
+        },
+      },
+    ]);
+
+    let totalRevenue = 0;
+    let cashPayment = 0;
+    let bankTransfer = 0;
+
+    stats.forEach(stat => {
+      totalRevenue += stat.revenue;
+      if (stat._id === 'COD') {
+        cashPayment = stat.revenue;
+      } else {
+        bankTransfer += stat.revenue;
+      }
+    });
+
+    return {
+      totalRevenue,
+      cashPayment,
+      bankTransfer,
+    };
+  }
+
+  private async getOrderStatusCounts(): Promise<{
+    totalOrders: number;
+    pendingOrders: number;
+    processingOrders: number;
+    deliveredOrders: number;
+  }> {
+    const stats = await this.orderModel.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    let totalOrders = 0;
+    let pendingOrders = 0;
+    let processingOrders = 0;
+    let deliveredOrders = 0;
+
+    stats.forEach(stat => {
+      totalOrders += stat.count;
+      switch (stat._id) {
+        case 'pending':
+          pendingOrders = stat.count;
+          break;
+        case 'confirmed':
+        case 'shipping':
+          processingOrders += stat.count;
+          break;
+        case 'delivered':
+          deliveredOrders = stat.count;
+          break;
+      }
+    });
+
+    return {
+      totalOrders,
+      pendingOrders,
+      processingOrders,
+      deliveredOrders,
+    };
+  }
+
+  private async getMonthlyRevenueByYear(year: number): Promise<{
+    [key: string]: number;
+  }> {
+    const monthlyRevenue = await this.orderModel.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(year, 0, 1),
+            $lte: new Date(year, 11, 31, 23, 59, 59, 999),
+          },
+          status: 'delivered',
+        },
+      },
+      {
+        $group: {
+          _id: { $month: '$createdAt' },
+          revenue: { $sum: '$total' },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const result: { [key: string]: number } = {};
+    
+    // Khởi tạo tất cả tháng với giá trị 0
+    for (let i = 1; i <= 12; i++) {
+      result[i.toString()] = 0;
+    }
+
+    // Cập nhật doanh thu thực tế
+    monthlyRevenue.forEach(stat => {
+      result[stat._id.toString()] = stat.revenue;
+    });
+
+    return result;
   }
 }
