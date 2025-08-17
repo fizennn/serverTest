@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Patch,
+  Put,
   Param,
   Delete,
   UseGuards,
@@ -13,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { VouchersService } from '../services/vouchers.service';
-import { CreateVoucherDto, UpdateVoucherDto, VoucherResponseDto, PaginatedVoucherResponseDto, CheckVoucherDto, CalculateMultipleVouchersDto } from '../dtos/voucher.dto';
+import { CreateVoucherDto, UpdateVoucherDto, VoucherResponseDto, PaginatedVoucherResponseDto, CheckVoucherDto, CalculateMultipleVouchersDto, VoucherSearchDto, BulkUpdateVoucherDto } from '../dtos/voucher.dto';
 import { JwtAuthGuard } from '@/guards/jwt-auth.guard';
 import { AdminGuard } from '@/guards/admin.guard';
 import { UsersService } from '@/users/services/users.service';
@@ -42,14 +43,12 @@ export class VouchersController {
 
   @Get()
   @ApiOperation({ 
-    summary: 'Lấy danh sách voucher',
-    description: 'Lấy danh sách voucher có phân trang. Hỗ trợ 2 loại: item (giảm giá sản phẩm) và ship (giảm giá vận chuyển).'
+    summary: 'Tìm kiếm voucher nâng cao',
+    description: 'Tìm kiếm voucher với nhiều tiêu chí: từ khóa, loại, thời gian, giá trị, stock, user, sắp xếp...'
   })
-  @ApiQuery({ name: 'page', required: false, description: 'Trang hiện tại', example: 1 })
-  @ApiQuery({ name: 'limit', required: false, description: 'Số lượng item trên mỗi trang', example: 10 })
   @ApiResponse({ status: 200, description: 'Danh sách voucher', type: PaginatedVoucherResponseDto })
-  findAll(@Query('page') page?: number, @Query('limit') limit?: number) {
-    return this.vouchersService.findAll(page, limit);
+  findAll(@Query() searchDto: VoucherSearchDto) {
+    return this.vouchersService.findManyAdvanced(searchDto);
   }
 
   @Get('active')
@@ -151,22 +150,57 @@ export class VouchersController {
     return this.usersService.removeVoucherFromUser(userId, voucherId, this.vouchersService);
   }
 
+  @Get(':id/detail')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Lấy thông tin chi tiết voucher (Admin only)',
+    description: 'Lấy thông tin chi tiết của voucher bao gồm danh sách user và thống kê sử dụng'
+  })
+  @ApiResponse({ status: 200, description: 'Thông tin chi tiết voucher' })
+  @ApiResponse({ status: 404, description: 'Voucher không tồn tại' })
+  async getVoucherDetail(@Param('id') id: string) {
+    return this.vouchersService.getVoucherDetail(id);
+  }
+
   @Get(':id')
-  @ApiOperation({ summary: 'Lấy thông tin voucher theo ID' })
+  @ApiOperation({ 
+    summary: 'Lấy thông tin voucher theo ID',
+    description: 'Lấy thông tin chi tiết của voucher bao gồm danh sách user có quyền sử dụng'
+  })
   @ApiResponse({ status: 200, description: 'Thông tin voucher', type: VoucherResponseDto })
   @ApiResponse({ status: 404, description: 'Voucher không tồn tại' })
   findOne(@Param('id') id: string) {
     return this.vouchersService.findOne(id);
   }
 
-//   @Patch(':id')
-//   @UseGuards(JwtAuthGuard, AdminGuard)
-//   @ApiBearerAuth()
-//   @ApiOperation({ summary: 'Cập nhật voucher (Admin only)' })
-//   @ApiResponse({ status: 200, description: 'Voucher được cập nhật thành công', type: VoucherResponseDto })
-//   update(@Param('id') id: string, @Body() updateVoucherDto: UpdateVoucherDto) {
-//     return this.vouchersService.update(id, updateVoucherDto);
-//   }
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Cập nhật voucher (Admin only) - PATCH',
+    description: 'Cập nhật thông tin voucher. Chỉ admin mới có quyền cập nhật voucher.'
+  })
+  @ApiResponse({ status: 200, description: 'Voucher được cập nhật thành công', type: VoucherResponseDto })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
+  @ApiResponse({ status: 404, description: 'Voucher không tồn tại' })
+  update(@Param('id') id: string, @Body() updateVoucherDto: UpdateVoucherDto) {
+    return this.vouchersService.update(id, updateVoucherDto);
+  }
+
+  @Put(':id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Cập nhật voucher (Admin only) - PUT',
+    description: 'Cập nhật thông tin voucher. Chỉ admin mới có quyền cập nhật voucher. (Tương thích với PUT method)'
+  })
+  @ApiResponse({ status: 200, description: 'Voucher được cập nhật thành công', type: VoucherResponseDto })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
+  @ApiResponse({ status: 404, description: 'Voucher không tồn tại' })
+  updatePut(@Param('id') id: string, @Body() updateVoucherDto: UpdateVoucherDto) {
+    return this.vouchersService.update(id, updateVoucherDto);
+  }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -177,29 +211,52 @@ export class VouchersController {
     return this.vouchersService.disable(id);
   }
 
-//   @Post(':id/add-user')
-//   @UseGuards(JwtAuthGuard, AdminGuard)
-//   @ApiBearerAuth()
-//   @ApiOperation({ summary: 'Thêm user vào voucher (Admin only)' })
-//   @ApiResponse({ status: 200, description: 'User được thêm vào voucher thành công', type: VoucherResponseDto })
-//   addUserToVoucher(
-//     @Param('id') voucherId: string,
-//     @Body('userId') userId: string,
-//   ) {
-//     return this.vouchersService.addUserToVoucher(voucherId, userId);
-//   }
+  @Patch(':id/enable')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Kích hoạt voucher (Admin only)',
+    description: 'Kích hoạt lại voucher đã bị vô hiệu hóa. Voucher sẽ có thể được sử dụng lại.'
+  })
+  @ApiResponse({ status: 200, description: 'Voucher được kích hoạt thành công', type: VoucherResponseDto })
+  @ApiResponse({ status: 404, description: 'Voucher không tồn tại' })
+  enable(@Param('id') id: string) {
+    return this.vouchersService.enable(id);
+  }
 
-//   @Post(':id/remove-user')
-//   @UseGuards(JwtAuthGuard, AdminGuard)
-//   @ApiBearerAuth()
-//   @ApiOperation({ summary: 'Xóa user khỏi voucher (Admin only)' })
-//   @ApiResponse({ status: 200, description: 'User được xóa khỏi voucher thành công', type: VoucherResponseDto })
-//   removeUserFromVoucher(
-//     @Param('id') voucherId: string,
-//     @Body('userId') userId: string,
-//   ) {
-//     return this.vouchersService.removeUserFromVoucher(voucherId, userId);
-//   }
+  @Post(':id/add-user')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Thêm user vào voucher (Admin only)',
+    description: 'Thêm quyền sử dụng voucher cho user. Voucher sẽ được giảm stock và user có thể sử dụng voucher này.'
+  })
+  @ApiResponse({ status: 200, description: 'User được thêm vào voucher thành công', type: VoucherResponseDto })
+  @ApiResponse({ status: 400, description: 'User ID không hợp lệ hoặc user đã có quyền sử dụng voucher' })
+  @ApiResponse({ status: 404, description: 'Voucher không tồn tại' })
+  addUserToVoucher(
+    @Param('id') voucherId: string,
+    @Body('userId') userId: string,
+  ) {
+    return this.vouchersService.addUserToVoucher(voucherId, userId);
+  }
+
+  @Post(':id/remove-user')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Xóa user khỏi voucher (Admin only)',
+    description: 'Xóa quyền sử dụng voucher của user. Voucher sẽ được trả lại stock và user không thể sử dụng voucher này nữa.'
+  })
+  @ApiResponse({ status: 200, description: 'User được xóa khỏi voucher thành công', type: VoucherResponseDto })
+  @ApiResponse({ status: 400, description: 'User ID không hợp lệ hoặc user không có quyền sử dụng voucher' })
+  @ApiResponse({ status: 404, description: 'Voucher không tồn tại' })
+  removeUserFromVoucher(
+    @Param('id') voucherId: string,
+    @Body('userId') userId: string,
+  ) {
+    return this.vouchersService.removeUserFromVoucher(voucherId, userId);
+  }
 
   @Post(':id/validate')
   @UseGuards(JwtAuthGuard)
@@ -254,6 +311,58 @@ export class VouchersController {
       subtotal,
       shipCost
     );
+  }
+
+  @Post('duplicate/:id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Sao chép voucher (Admin only)',
+    description: 'Tạo một voucher mới dựa trên voucher hiện có. Voucher mới sẽ có cùng thông tin nhưng ID khác và có thể được chỉnh sửa.'
+  })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Voucher được sao chép thành công',
+    type: VoucherResponseDto
+  })
+  @ApiResponse({ status: 404, description: 'Voucher không tồn tại' })
+  async duplicateVoucher(@Param('id') id: string) {
+    return this.vouchersService.duplicateVoucher(id);
+  }
+
+  @Post('bulk-update')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Cập nhật hàng loạt voucher (Admin only)',
+    description: 'Cập nhật nhiều voucher cùng lúc với cùng một bộ thông tin. Hữu ích khi cần thay đổi thông tin chung cho nhiều voucher.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Cập nhật voucher thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'number', example: 5, description: 'Số voucher cập nhật thành công' },
+        failed: { type: 'number', example: 2, description: 'Số voucher cập nhật thất bại' },
+        results: { 
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              voucherId: { type: 'string', example: '507f1f77bcf86cd799439011' },
+              success: { type: 'boolean', example: true },
+              message: { type: 'string', example: 'Updated successfully' }
+            }
+          }
+        }
+      }
+    }
+  })
+  async bulkUpdate(
+    @Body() bulkUpdateDto: BulkUpdateVoucherDto
+  ) {
+    return this.vouchersService.bulkUpdate(bulkUpdateDto.voucherIds, bulkUpdateDto.updateData);
   }
 
   @Post('calculate-discounts')

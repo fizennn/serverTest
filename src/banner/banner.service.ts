@@ -87,19 +87,21 @@ export class BannersService {
 
     const filter: any = {};
 
-    // if (type) filter.type = type;
-    // if (position) filter.position = position;
-    // if (isActive !== undefined) filter.isActive = isActive;
-    // if (tag) filter.tags = { $in: [tag] };
+    if (type) filter.type = type;
+    if (position) filter.position = position;
+    if (isActive !== undefined) filter.isActive = isActive;
+    if (tag) filter.tags = { $in: [tag] };
 
-    // if (search) {
-    //   filter.$or = [
-    //     { title: { $regex: search, $options: 'i' } },
-    //     { description: { $regex: search, $options: 'i' } }
-    //   ];
-    // }
-    const allBanner = await this.bannerModel.find().lean();
-    console.log('All Banners:', allBanner.length);
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    console.log('Filter:', filter);
+    console.log('Query params:', query);
+    
     const [banners, totalBanners] = await Promise.all([
       this.bannerModel
         .find(filter)
@@ -111,6 +113,9 @@ export class BannersService {
         .lean(),
       this.bannerModel.countDocuments(filter),
     ]);
+
+    console.log('Found banners:', banners.length);
+    console.log('Total banners:', totalBanners);
 
     const totalPages = Math.ceil(totalBanners / limit);
 
@@ -134,26 +139,34 @@ export class BannersService {
     // Build filter for active banners
     const filter: any = {
       isActive: true,
-      // $or: [
-      //   { startDate: { $exists: false } },
-      //   { startDate: null },
-      //   { startDate: { $lte: now } },
-      // ],
     };
 
-    // Add end date filter
-    // filter.$and = [
-    //   {
-    //     $or: [
-    //       { endDate: { $exists: false } },
-    //       { endDate: null },
-    //       { endDate: { $gte: now } },
-    //     ],
-    //   },
-    // ];
+    // Add start date filter - banner phải đã bắt đầu hoặc chưa có start date
+    const startDateFilter = {
+      $or: [
+        { startDate: { $exists: false } },
+        { startDate: null },
+        { startDate: { $lte: now } },
+      ],
+    };
 
-    //if (type) filter.type = type;
-    // if (position) filter.position = position;
+    // Add end date filter - banner chưa kết thúc hoặc chưa có end date
+    const endDateFilter = {
+      $or: [
+        { endDate: { $exists: false } },
+        { endDate: null },
+        { endDate: { $gte: now } },
+      ],
+    };
+
+    // Combine filters
+    filter.$and = [startDateFilter, endDateFilter];
+
+    if (type) filter.type = type;
+    if (position) filter.position = position;
+
+    console.log('Public filter:', filter);
+    console.log('Current time:', now);
 
     const banners = await this.bannerModel
       .find(filter)
@@ -161,11 +174,15 @@ export class BannersService {
       .sort({ position: 1, order: 1 })
       .lean();
 
+    console.log('Found banners:', banners.length);
+
     // Track views (async, không chờ kết quả)
-    this.trackViews(
-      banners.map(b => b._id),
-      userAgent,
-    );
+    if (banners.length > 0) {
+      this.trackViews(
+        banners.map(b => b._id),
+        userAgent,
+      );
+    }
 
     return { banners };
   }

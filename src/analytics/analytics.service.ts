@@ -13,6 +13,7 @@ import {
   VoucherUsageDto,
   DateRangeQueryDto,
   DashboardStatsDto,
+  RevenueByTimeDto,
 } from './dto/analytics.dto';
 import { Order } from '@/orders/schemas/order.schema';
 import { Product } from '@/products/schemas/product.schema';
@@ -108,6 +109,8 @@ export class AnalyticsService {
         cancelledOrders: 0,
         totalProductsSold: 0,
         totalRevenue: 0,
+        cashPayment: 0,
+        bankTransfer: 0,
         successRate: 0,
         orderStatusStats,
       };
@@ -118,8 +121,15 @@ export class AnalyticsService {
         ? (overviewStats.successfulOrders / overviewStats.totalOrders) * 100
         : 0;
 
+    // Lấy thống kê thanh toán
+    const paymentStats = await this.getPaymentMethodStats(dateRange);
+    const cashPayment = paymentStats.find(stat => stat.paymentMethod === 'COD')?.revenue || 0;
+    const bankTransfer = paymentStats.find(stat => stat.paymentMethod === 'BANK_TRANSFER')?.revenue || 0;
+
     return {
       ...overviewStats,
+      cashPayment,
+      bankTransfer,
       successRate: Math.round(successRate * 100) / 100,
       orderStatusStats,
     };
@@ -644,5 +654,86 @@ export class AnalyticsService {
     });
 
     return result;
+  }
+
+  async getRevenueByTime(
+    dateRange?: DateRangeQueryDto,
+    timeType: 'day' | 'month' | 'year' = 'month',
+  ): Promise<RevenueByTimeDto[]> {
+    const matchCondition = {
+      ...this.buildDateFilter(dateRange),
+      status: 'delivered',
+    };
+
+    let groupBy: any;
+    let dateFormat: string;
+
+    switch (timeType) {
+      case 'day':
+        groupBy = {
+          year: { $year: '$createdAt' },
+          month: { $month: '$createdAt' },
+          day: { $dayOfMonth: '$createdAt' },
+        };
+        dateFormat = '%Y-%m-%d';
+        break;
+      case 'month':
+        groupBy = {
+          year: { $year: '$createdAt' },
+          month: { $month: '$createdAt' },
+        };
+        dateFormat = '%Y-%m';
+        break;
+      case 'year':
+        groupBy = {
+          year: { $year: '$createdAt' },
+        };
+        dateFormat = '%Y';
+        break;
+      default:
+        groupBy = {
+          year: { $year: '$createdAt' },
+          month: { $month: '$createdAt' },
+        };
+        dateFormat = '%Y-%m';
+    }
+
+    const revenueStats = await this.orderModel.aggregate([
+      { $match: matchCondition },
+      {
+        $group: {
+          _id: groupBy,
+          revenue: { $sum: '$total' },
+          orderCount: { $sum: 1 },
+        },
+      },
+      {
+        $addFields: {
+          period: {
+            $dateToString: {
+              format: dateFormat,
+              date: {
+                $dateFromParts: {
+                  year: '$_id.year',
+                  month: { $ifNull: ['$_id.month', 1] },
+                  day: { $ifNull: ['$_id.day', 1] },
+                },
+              },
+            },
+          },
+        },
+      },
+      { $sort: { period: 1 } },
+      {
+        $project: {
+          _id: 0,
+          period: 1,
+          revenue: 1,
+          orderCount: 1,
+        },
+      },
+    ]);
+
+    return revenueStats;
   }
 }

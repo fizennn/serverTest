@@ -55,6 +55,187 @@ export class VouchersService {
     return { data, total, pages };
   }
 
+  async findManyAdvanced(searchDto: any): Promise<{ data: Voucher[], total: number, pages: number }> {
+    try {
+      const {
+        keyword,
+        page = '1',
+        limit = '10',
+        type,
+        isDisable,
+        startDate,
+        endDate,
+        isActive,
+        isExpired,
+        minDiscount,
+        maxDiscount,
+        minCondition,
+        maxCondition,
+        minLimit,
+        maxLimit,
+        minStock,
+        maxStock,
+        hasStock,
+        userId,
+        hasUsers,
+        sortBy = 'createdAt',
+        sortOrder = 'desc',
+        includeExpired,
+        includeDisabled,
+      } = searchDto;
+
+      const pageSize = isNaN(Number(limit)) ? 10 : parseInt(limit);
+      const currentPage = isNaN(Number(page)) ? 1 : parseInt(page);
+
+      // Xây dựng query filter
+      let filter: any = {};
+
+      // Tìm kiếm theo từ khóa
+      if (keyword) {
+        const decodedKeyword = decodeURIComponent(keyword);
+        
+        // Kiểm tra xem keyword có phải là ObjectId hợp lệ không
+        const isObjectId = Types.ObjectId.isValid(decodedKeyword);
+        
+        if (isObjectId) {
+          // Nếu là ObjectId, tìm kiếm theo _id
+          filter._id = new Types.ObjectId(decodedKeyword);
+        } else {
+          // Nếu không phải ObjectId, tìm kiếm theo text (có thể mở rộng sau)
+          // Hiện tại voucher không có field text để search, nên chỉ search theo ID
+          filter._id = new Types.ObjectId(decodedKeyword);
+        }
+      }
+
+      // Filter theo loại voucher
+      if (type && ['item', 'ship'].includes(type)) {
+        filter.type = type;
+      }
+
+      // Filter theo trạng thái disable
+      if (isDisable !== undefined) {
+        filter.isDisable = isDisable === 'true';
+      } else if (includeDisabled !== 'true') {
+        // Mặc định không bao gồm voucher đã disable trừ khi có yêu cầu
+        filter.isDisable = false;
+      }
+
+      // Filter theo thời gian
+      if (startDate) {
+        const start = new Date(startDate);
+        if (!isNaN(start.getTime())) {
+          filter.start = { $gte: start };
+        }
+      }
+
+      if (endDate) {
+        const end = new Date(endDate);
+        if (!isNaN(end.getTime())) {
+          filter.end = { $lte: end };
+        }
+      }
+
+      // Filter theo trạng thái active/expired
+      const now = new Date();
+      if (isActive === 'true') {
+        filter.start = { $lte: now };
+        filter.end = { $gte: now };
+      } else if (isExpired === 'true') {
+        filter.end = { $lt: now };
+      } else if (includeExpired !== 'true') {
+        // Mặc định chỉ lấy voucher chưa hết hạn trừ khi có yêu cầu
+        filter.end = { $gte: now };
+      }
+
+      // Filter theo % giảm giá
+      if (minDiscount && !isNaN(Number(minDiscount))) {
+        filter.disCount = { ...filter.disCount, $gte: Number(minDiscount) };
+      }
+      if (maxDiscount && !isNaN(Number(maxDiscount))) {
+        filter.disCount = { ...filter.disCount, $lte: Number(maxDiscount) };
+      }
+
+      // Filter theo điều kiện
+      if (minCondition && !isNaN(Number(minCondition))) {
+        filter.condition = { ...filter.condition, $gte: Number(minCondition) };
+      }
+      if (maxCondition && !isNaN(Number(maxCondition))) {
+        filter.condition = { ...filter.condition, $lte: Number(maxCondition) };
+      }
+
+      // Filter theo giới hạn giảm giá
+      if (minLimit && !isNaN(Number(minLimit))) {
+        filter.limit = { ...filter.limit, $gte: Number(minLimit) };
+      }
+      if (maxLimit && !isNaN(Number(maxLimit))) {
+        filter.limit = { ...filter.limit, $lte: Number(maxLimit) };
+      }
+
+      // Filter theo stock
+      if (minStock && !isNaN(Number(minStock))) {
+        filter.stock = { ...filter.stock, $gte: Number(minStock) };
+      }
+      if (maxStock && !isNaN(Number(maxStock))) {
+        filter.stock = { ...filter.stock, $lte: Number(maxStock) };
+      }
+      if (hasStock === 'true') {
+        filter.stock = { ...filter.stock, $gt: 0 };
+      } else if (hasStock === 'false') {
+        filter.stock = 0;
+      }
+
+      // Filter theo user
+      if (userId) {
+        if (!Types.ObjectId.isValid(userId)) {
+          throw new BadRequestException('User ID không hợp lệ');
+        }
+        const userObjectId = new Types.ObjectId(userId);
+        filter.userId = { $in: [userObjectId] };
+      }
+
+      if (hasUsers === 'true') {
+        filter.userId = { $exists: true, $ne: [] };
+      } else if (hasUsers === 'false') {
+        filter.$or = [
+          { userId: { $exists: false } },
+          { userId: [] }
+        ];
+      }
+
+      // Xây dựng sort
+      let sort: any = {};
+      const validSortFields = [
+        'disCount',
+        'condition',
+        'limit',
+        'stock',
+        'start',
+        'end',
+        'createdAt',
+        'updatedAt'
+      ];
+      const validSortOrders = ['asc', 'desc'];
+      
+      if (validSortFields.includes(sortBy) && validSortOrders.includes(sortOrder)) {
+        sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+      } else {
+        sort.createdAt = -1; // Mặc định sắp xếp theo ngày tạo mới nhất
+      }
+
+      // Thực hiện query
+      const skip = (currentPage - 1) * pageSize;
+      const [data, total] = await Promise.all([
+        this.voucherModel.find(filter).sort(sort).skip(skip).limit(pageSize).exec(),
+        this.voucherModel.countDocuments(filter).exec()
+      ]);
+
+      const pages = Math.ceil(total / pageSize);
+      return { data, total, pages };
+    } catch (error) {
+      throw new BadRequestException(`Lỗi tìm kiếm voucher: ${error.message}`);
+    }
+  }
+
   async findActive(): Promise<Voucher[]> {
     const now = new Date();
     return await this.voucherModel.find({
@@ -125,14 +306,165 @@ export class VouchersService {
       throw new BadRequestException('Invalid voucher ID');
     }
 
+    // Kiểm tra voucher có tồn tại không
+    const existingVoucher = await this.voucherModel.findById(id).exec();
+    if (!existingVoucher) {
+      throw new NotFoundException('Voucher not found');
+    }
+
+    // Kiểm tra voucher có bị disable không
+    if (existingVoucher.isDisable) {
+      throw new BadRequestException('Không thể cập nhật voucher đã bị vô hiệu hóa');
+    }
+
+    // Validation cho ngày tháng
+    if (updateVoucherDto.end) {
+      const now = new Date();
+      if (updateVoucherDto.end <= now) {
+        throw new BadRequestException('Ngày kết thúc phải lớn hơn ngày hiện tại');
+      }
+    }
+
+    if (updateVoucherDto.start && updateVoucherDto.end) {
+      if (updateVoucherDto.start >= updateVoucherDto.end) {
+        throw new BadRequestException('Ngày bắt đầu phải nhỏ hơn ngày kết thúc');
+      }
+    }
+
+    // Validation cho type
+    if (updateVoucherDto.type && !['item', 'ship'].includes(updateVoucherDto.type)) {
+      throw new BadRequestException('Loại voucher phải là "item" hoặc "ship"');
+    }
+
+    // Validation cho discount
+    if (updateVoucherDto.disCount !== undefined) {
+      if (updateVoucherDto.disCount <= 0 || updateVoucherDto.disCount > 100) {
+        throw new BadRequestException('Phần trăm giảm giá phải từ 1 đến 100');
+      }
+    }
+
+    // Validation cho condition và limit
+    if (updateVoucherDto.condition !== undefined && updateVoucherDto.condition < 0) {
+      throw new BadRequestException('Điều kiện tối thiểu không được âm');
+    }
+
+    if (updateVoucherDto.limit !== undefined && updateVoucherDto.limit < 0) {
+      throw new BadRequestException('Giới hạn giảm giá không được âm');
+    }
+
+    if (updateVoucherDto.stock !== undefined && updateVoucherDto.stock < 0) {
+      throw new BadRequestException('Stock không được âm');
+    }
+
+    // Xử lý userId array nếu có
+    let updateData: any = { ...updateVoucherDto };
+    if (updateVoucherDto.userId) {
+      // Validate userId array
+      for (const userId of updateVoucherDto.userId) {
+        if (!Types.ObjectId.isValid(userId)) {
+          throw new BadRequestException(`Invalid user ID: ${userId}`);
+        }
+      }
+      // Convert string array to ObjectId array
+      updateData.userId = updateVoucherDto.userId.map(id => new Types.ObjectId(id));
+    }
+
     const voucher = await this.voucherModel
-      .findByIdAndUpdate(id, updateVoucherDto, { new: true })
+      .findByIdAndUpdate(id, updateData, { new: true })
       .exec();
     
+    return voucher;
+  }
+
+  async bulkUpdate(voucherIds: string[], updateData: UpdateVoucherDto): Promise<any> {
+    const results = [];
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (const voucherId of voucherIds) {
+      try {
+        await this.update(voucherId, updateData);
+        results.push({
+          voucherId,
+          success: true,
+          message: 'Updated successfully'
+        });
+        successCount++;
+      } catch (error) {
+        results.push({
+          voucherId,
+          success: false,
+          message: error.message
+        });
+        failedCount++;
+      }
+    }
+
+    return {
+      success: successCount,
+      failed: failedCount,
+      results
+    };
+  }
+
+  async duplicateVoucher(id: string): Promise<Voucher> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid voucher ID');
+    }
+
+    const originalVoucher = await this.voucherModel.findById(id).exec();
+    if (!originalVoucher) {
+      throw new NotFoundException('Voucher not found');
+    }
+
+    // Tạo voucher mới với thông tin từ voucher gốc
+    const voucherData = {
+      type: originalVoucher.type,
+      disCount: originalVoucher.disCount,
+      condition: originalVoucher.condition,
+      limit: originalVoucher.limit,
+      stock: originalVoucher.stock,
+      start: originalVoucher.start,
+      end: originalVoucher.end,
+      isDisable: false, // Voucher mới luôn được enable
+      userId: [] // Reset danh sách user
+    };
+
+    const newVoucher = new this.voucherModel(voucherData);
+    const createdVoucher = await newVoucher.save();
+
+    return createdVoucher;
+  }
+
+  async getVoucherDetail(id: string): Promise<any> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid voucher ID');
+    }
+
+    const voucher = await this.voucherModel.findById(id).exec();
     if (!voucher) {
       throw new NotFoundException('Voucher not found');
     }
-    return voucher;
+
+    // Tính toán thống kê
+    const now = new Date();
+    const isActive = voucher.start <= now && voucher.end >= now && !voucher.isDisable;
+    const isExpired = voucher.end < now;
+    const isNotStarted = voucher.start > now;
+    const usedCount = voucher.userId.length;
+    const remainingStock = voucher.stock;
+
+    return {
+      ...voucher.toObject(),
+      statistics: {
+        isActive,
+        isExpired,
+        isNotStarted,
+        usedCount,
+        remainingStock,
+        totalUsers: voucher.userId.length
+      }
+    };
   }
 
   async remove(id: string): Promise<void> {
@@ -158,6 +490,29 @@ export class VouchersService {
     if (!voucher) {
       throw new NotFoundException('Voucher not found');
     }
+    return voucher;
+  }
+
+  async enable(id: string): Promise<Voucher> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid voucher ID');
+    }
+
+    const existingVoucher = await this.voucherModel.findById(id).exec();
+    if (!existingVoucher) {
+      throw new NotFoundException('Voucher not found');
+    }
+
+    // Kiểm tra xem voucher có hết hạn chưa
+    const now = new Date();
+    if (existingVoucher.end < now) {
+      throw new BadRequestException('Không thể kích hoạt voucher đã hết hạn');
+    }
+
+    const voucher = await this.voucherModel
+      .findByIdAndUpdate(id, { isDisable: false }, { new: true })
+      .exec();
+    
     return voucher;
   }
 

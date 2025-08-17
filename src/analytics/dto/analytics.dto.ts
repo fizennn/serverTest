@@ -38,6 +38,12 @@ export class OrderOverviewDto {
   @ApiProperty({ description: 'Tổng doanh thu (VNĐ)', example: 125000000 })
   totalRevenue: number;
 
+  @ApiProperty({ description: 'Thanh toán tiền mặt (VNĐ)', example: 75000000 })
+  cashPayment: number;
+
+  @ApiProperty({ description: 'Thanh toán chuyển khoản (VNĐ)', example: 50000000 })
+  bankTransfer: number;
+
   @ApiProperty({ description: 'Tỷ lệ thành công (%)', example: 78.4 })
   successRate: number;
 
@@ -277,4 +283,15 @@ export class DashboardStatsDto {
     type: [TopProductDto]
   })
   topProducts: TopProductDto[];
+}
+
+export class RevenueByTimeDto {
+  @ApiProperty({ description: 'Khoảng thời gian', example: '2024-01' })
+  period: string;
+
+  @ApiProperty({ description: 'Doanh thu (VNĐ)', example: 12500000 })
+  revenue: number;
+
+  @ApiProperty({ description: 'Số đơn hàng', example: 125 })
+  orderCount: number;
 }

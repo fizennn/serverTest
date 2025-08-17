@@ -17,6 +17,7 @@ import {
   VoucherUsageDto,
   DateRangeQueryDto,
   DashboardStatsDto,
+  RevenueByTimeDto,
 } from './dto/analytics.dto';
 import { AdminGuard } from '@/guards/admin.guard';
 import { AnalyticsService } from './analytics.service';
@@ -267,5 +268,44 @@ export class AnalyticsController {
   ): Promise<VoucherUsageDto[]> {
     const dateRange = startDate || endDate ? { startDate, endDate } : undefined;
     return this.analyticsService.getVoucherUsageStats(dateRange);
+  }
+
+  @Get('revenue-by-time')
+  @ApiOperation({
+    summary: '8. Doanh thu theo thời gian',
+    description: 'Thống kê doanh thu và số đơn hàng theo từng ngày, tháng hoặc năm',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Ngày bắt đầu (YYYY-MM-DD)',
+    example: '2024-01-01',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Ngày kết thúc (YYYY-MM-DD)',
+    example: '2024-12-31',
+  })
+  @ApiQuery({
+    name: 'timeType',
+    required: false,
+    description: 'Kiểu thời gian nhóm dữ liệu (day, month, year)',
+    example: 'month',
+    enum: ['day', 'month', 'year'],
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy thống kê doanh thu theo thời gian thành công',
+    type: [RevenueByTimeDto],
+  })
+  @ApiResponse({ status: 403, description: 'Chỉ admin mới có quyền truy cập' })
+  async getRevenueByTime(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('timeType') timeType: 'day' | 'month' | 'year' = 'month',
+  ): Promise<RevenueByTimeDto[]> {
+    const dateRange = startDate || endDate ? { startDate, endDate } : undefined;
+    return this.analyticsService.getRevenueByTime(dateRange, timeType);
   }
 }
