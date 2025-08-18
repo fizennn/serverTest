@@ -80,6 +80,143 @@ export class UsersService {
     }
   }
 
+  async createAdminUser(user: Partial<User>): Promise<UserDocument> {
+    try {
+      // Kiểm tra roleId bắt buộc
+      if (!user.roleId) {
+        throw new BadRequestException('RoleId là bắt buộc');
+      }
+
+      // Kiểm tra role có tồn tại không
+      const role = await this.roleModel.findById(user.roleId);
+      if (!role) {
+        throw new BadRequestException('Role không tồn tại');
+      }
+
+      const hashedPassword = await hashPassword(user.password ?? '');
+      const newUser = await this.userModel.create({
+        ...user,
+        password: hashedPassword,
+        isAdmin: true, // Tài khoản admin
+        isActive: true, // Tài khoản đã kích hoạt
+      });
+
+      // Populate roleId để trả về thông tin đầy đủ
+      const populatedUser = await this.userModel.findById(newUser._id).populate({
+        path: 'roleId',
+        select: 'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt',
+      });
+
+      return populatedUser;
+    } catch (error: any) {
+      console.error('Error creating admin user:', error);
+      
+      if (error.code === 11000) {
+        throw new BadRequestException('Email already exists');
+      }
+
+      if (error.name === 'ValidationError') {
+        // Log chi tiết lỗi validation
+        console.error('Validation error details:', error.errors);
+        const validationMessages = Object.values(error.errors).map((err: any) => err.message).join(', ');
+        throw new BadRequestException(`Validation error: ${validationMessages}`);
+      }
+
+      // Log lỗi chi tiết
+      console.error('Unexpected error:', error.message, error.stack);
+      throw new BadRequestException(`Failed to create admin user: ${error.message}`);
+    }
+  }
+
+  async updateAdminUser(id: string, user: Partial<User>): Promise<UserDocument> {
+    try {
+      // Kiểm tra user có tồn tại và là admin không
+      const existingUser = await this.userModel.findById(id);
+      if (!existingUser) {
+        throw new NotFoundException('Không tìm thấy user admin');
+      }
+
+      if (!existingUser.isAdmin) {
+        throw new BadRequestException('User không phải admin');
+      }
+
+      // Kiểm tra roleId bắt buộc
+      if (!user.roleId) {
+        throw new BadRequestException('RoleId là bắt buộc');
+      }
+
+      // Kiểm tra role có tồn tại không
+      const role = await this.roleModel.findById(user.roleId);
+      if (!role) {
+        throw new BadRequestException('Role không tồn tại');
+      }
+
+      // Nếu có password mới, hash password
+      let updateData = { ...user };
+      if (user.password) {
+        updateData.password = await hashPassword(user.password);
+      }
+
+      // Cập nhật user
+      const updatedUser = await this.userModel.findByIdAndUpdate(
+        id,
+        updateData,
+        { new: true, runValidators: true }
+      );
+
+      if (!updatedUser) {
+        throw new NotFoundException('Không tìm thấy user admin');
+      }
+
+      // Populate roleId để trả về thông tin đầy đủ
+      const populatedUser = await this.userModel.findById(updatedUser._id).populate({
+        path: 'roleId',
+        select: 'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt',
+      });
+
+      return populatedUser;
+    } catch (error: any) {
+      if (error.code === 11000) {
+        throw new BadRequestException('Email already exists');
+      }
+
+      if (error.name === 'ValidationError') {
+        throw new BadRequestException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  async deleteAdminUser(id: string, currentUserId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // Kiểm tra không thể xóa chính mình
+      if (id === currentUserId) {
+        throw new BadRequestException('Không thể xóa chính mình');
+      }
+
+      // Kiểm tra user có tồn tại và là admin không
+      const user = await this.userModel.findById(id);
+      if (!user) {
+        throw new NotFoundException('Không tìm thấy user admin');
+      }
+
+      if (!user.isAdmin) {
+        throw new BadRequestException('User không phải admin');
+      }
+
+      // Xóa user
+      await this.userModel.findByIdAndDelete(id);
+
+      return {
+        success: true,
+        message: 'User admin đã được xóa thành công'
+      };
+    } catch (error: any) {
+      throw error;
+    }
+  }
+
   async createMany(users: Partial<User>[]): Promise<UserDocument[]> {
     try {
       return (await this.userModel.insertMany(
@@ -925,6 +1062,16 @@ export class UsersService {
       throw new BadRequestException(
         'Failed to get employee activity statistics',
       );
+    }
+  }
+
+  async getRoles() {
+    try {
+      const roles = await this.roleModel.find({}).select('_id name description isActive').exec();
+      return roles;
+    } catch (error) {
+      this.logger.error(`Failed to get roles: ${error.message}`);
+      throw new BadRequestException('Failed to get roles');
     }
   }
 }

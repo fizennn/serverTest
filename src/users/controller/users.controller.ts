@@ -30,6 +30,10 @@ import {
 import { VouchersService } from '../../vouchers/services/vouchers.service';
 import { JwtAuthGuard } from '@/guards/jwt-auth.guard';
 import { AddFavoriteProductDto } from '../dtos/add-favorite-product.dto';
+import { RegisterDto, CreateAdminUserDto, UpdateAdminUserDto } from '../dtos/register.dto';
+import { CurrentUser } from '@/decorators/current-user.decorator';
+import { UserDocument } from '../schemas/user.schema';
+
 @ApiTags('Người dùng')
 @ApiBearerAuth('JWT-auth')
 @Controller('users')
@@ -374,6 +378,123 @@ export class UsersController {
     @Body() credentials: AdminProfileDto,
   ) {
     return this.usersService.adminUpdate(id, credentials);
+  }
+
+  @Serialize(UserDto)
+  @Post('create-admin')
+  @UseGuards(AdminGuard)
+  @ApiOperation({ 
+    summary: 'Tạo user admin mới',
+    description: 'Admin có thể tạo user admin mới với isAdmin = true và isActive = true. User này sẽ không cần kích hoạt qua email.',
+  })
+  @ApiBody({ type: CreateAdminUserDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Tạo user admin thành công',
+    type: UserDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Dữ liệu không hợp lệ hoặc email đã tồn tại',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền tạo user admin.',
+  })
+  async createAdminUser(@Body() createAdminDto: CreateAdminUserDto) {
+    return this.usersService.createAdminUser(createAdminDto);
+  }
+
+  @Serialize(UserDto)
+  @Put('admin/:id')
+  @UseGuards(AdminGuard)
+  @ApiOperation({ 
+    summary: 'Cập nhật thông tin user admin',
+    description: 'Admin có thể cập nhật thông tin của user admin khác. Có thể cập nhật tất cả thông tin bao gồm role.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID của user admin cần cập nhật',
+    example: '665f1e2b2c8b2a0012a4e123',
+  })
+  @ApiBody({ type: UpdateAdminUserDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật user admin thành công',
+    type: UserDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Dữ liệu không hợp lệ hoặc user không phải admin',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền cập nhật user admin.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Không tìm thấy user admin',
+  })
+  async updateAdminUser(
+    @Param('id') id: string,
+    @Body() updateAdminDto: UpdateAdminUserDto,
+  ) {
+    return this.usersService.updateAdminUser(id, updateAdminDto);
+  }
+
+  @Delete('admin/:id')
+  @UseGuards(AdminGuard)
+  @ApiOperation({ 
+    summary: 'Xóa user admin',
+    description: 'Admin có thể xóa user admin khác. Không thể xóa chính mình.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID của user admin cần xóa',
+    example: '665f1e2b2c8b2a0012a4e123',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Xóa user admin thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'User admin đã được xóa thành công' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Không thể xóa chính mình hoặc user không phải admin',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền xóa user admin.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Không tìm thấy user admin',
+  })
+  async deleteAdminUser(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: UserDocument,
+  ) {
+    return this.usersService.deleteAdminUser(id, currentUser._id.toString());
+  }
+
+  @Get('roles')
+  @UseGuards(AdminGuard)
+  @ApiOperation({ 
+    summary: 'Lấy danh sách roles',
+    description: 'Lấy tất cả roles trong hệ thống để test',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách roles thành công',
+  })
+  async getRoles() {
+    return this.usersService.getRoles();
   }
 
   @Serialize(UserDto)
