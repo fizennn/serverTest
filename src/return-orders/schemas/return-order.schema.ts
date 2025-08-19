@@ -36,7 +36,7 @@ export class ReturnOrder {
   totalRefundAmount: number;
 
   @Prop({ 
-    enum: ['pending', 'approved', 'rejected', 'processing', 'completed', 'return-pending'],
+    enum: ['pending', 'approved', 'rejected', 'processing', 'completed'],
     default: 'pending'
   })
   status: string;

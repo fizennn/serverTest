@@ -154,7 +154,154 @@ export class CreateBannerDto {
   openInNewTab?: boolean;
 }
 
-export class UpdateBannerDto extends PartialType(CreateBannerDto) {}
+export class UpdateBannerDto extends PartialType(CreateBannerDto) {
+  @ApiProperty({ 
+    description: 'Tiêu đề banner', 
+    example: 'Khuyến mãi Black Friday - Giảm đến 50%',
+    required: false
+  })
+  @IsOptional()
+  @IsString({ message: 'Tiêu đề phải là chuỗi ký tự' })
+  title?: string;
+
+  @ApiProperty({ 
+    description: 'Mô tả banner', 
+    example: 'Cơ hội duy nhất trong năm! Hàng ngàn sản phẩm giảm giá sốc.',
+    required: false
+  })
+  @IsOptional()
+  @IsString({ message: 'Mô tả phải là chuỗi ký tự' })
+  description?: string;
+
+  @ApiProperty({ 
+    description: 'URL ảnh banner', 
+    example: 'https://example.com/banner-black-friday.jpg',
+    required: false
+  })
+  @IsOptional()
+  @IsUrl({}, { message: 'URL ảnh không hợp lệ' })
+  @Transform(({ value }) => {
+    console.log('DTO imageUrl transform:', value);
+    return value;
+  })
+  imageUrl?: string;
+
+  @ApiProperty({ 
+    description: 'URL ảnh banner cho mobile', 
+    example: 'https://example.com/banner-black-friday-mobile.jpg',
+    required: false
+  })
+  @IsOptional()
+  @IsUrl({}, { message: 'URL ảnh mobile không hợp lệ' })
+  mobileImageUrl?: string;
+
+  @ApiProperty({ 
+    description: 'Loại link', 
+    enum: LinkType,
+    example: LinkType.WEB,
+    required: false
+  })
+  @IsOptional()
+  @IsEnum(LinkType, { message: 'Loại link không hợp lệ' })
+  linkType?: LinkType;
+
+  @ApiProperty({ 
+    description: 'URL đích khi click banner', 
+    example: 'https://example.com/promotion',
+    required: false
+  })
+  @IsOptional()
+  @IsString({ message: 'URL đích phải là chuỗi ký tự' })
+  targetUrl?: string;
+
+  @ApiProperty({ 
+    description: 'Loại banner', 
+    enum: BannerType,
+    example: BannerType.PROMOTION,
+    required: false
+  })
+  @IsOptional()
+  @IsEnum(BannerType, { message: 'Loại banner không hợp lệ' })
+  type?: BannerType;
+
+  @ApiProperty({ 
+    description: 'Vị trí hiển thị banner', 
+    enum: BannerPosition,
+    example: BannerPosition.TOP,
+    required: false
+  })
+  @IsOptional()
+  @IsEnum(BannerPosition, { message: 'Vị trí banner không hợp lệ' })
+  position?: BannerPosition;
+
+  @ApiProperty({ 
+    description: 'Thứ tự hiển thị (0-999)', 
+    example: 1,
+    minimum: 0,
+    maximum: 999,
+    required: false
+  })
+  @IsOptional()
+  @IsNumber({}, { message: 'Thứ tự phải là số' })
+  @Min(0, { message: 'Thứ tự phải từ 0 trở lên' })
+  @Max(999, { message: 'Thứ tự không được vượt quá 999' })
+  order?: number;
+
+  @ApiProperty({ 
+    description: 'Trạng thái hiển thị banner', 
+    example: true,
+    required: false
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'Trạng thái phải là boolean' })
+  isActive?: boolean;
+
+  @ApiProperty({ 
+    description: 'Thời gian bắt đầu hiển thị (ISO string)', 
+    example: '2024-11-01T00:00:00.000Z',
+    required: false
+  })
+  @IsOptional()
+  @IsDateString({}, { message: 'Ngày bắt đầu không hợp lệ' })
+  startDate?: string;
+
+  @ApiProperty({ 
+    description: 'Thời gian kết thúc hiển thị (ISO string)', 
+    example: '2024-11-30T23:59:59.000Z',
+    required: false
+  })
+  @IsOptional()
+  @IsDateString({}, { message: 'Ngày kết thúc không hợp lệ' })
+  endDate?: string;
+
+  @ApiProperty({ 
+    description: 'Tags để quản lý banner',
+    example: ['black-friday', 'promotion', 'sale'],
+    required: false
+  })
+  @IsOptional()
+  @IsArray({ message: 'Tags phải là một mảng' })
+  @IsString({ each: true, message: 'Mỗi tag phải là chuỗi ký tự' })
+  tags?: string[];
+
+  @ApiProperty({ 
+    description: 'Ghi chú nội bộ', 
+    example: 'Banner cho chiến dịch Black Friday 2024',
+    required: false
+  })
+  @IsOptional()
+  @IsString({ message: 'Ghi chú phải là chuỗi ký tự' })
+  notes?: string;
+
+  @ApiProperty({ 
+    description: 'Banner có mở trong tab mới không', 
+    example: true,
+    required: false
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'openInNewTab phải là boolean' })
+  openInNewTab?: boolean;
+}
 
 export class BannerQueryDto {
   @ApiProperty({ 

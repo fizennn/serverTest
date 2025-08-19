@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { getBaseUrl } from '../utils/config';
 
 @Injectable()
 export class MailService {
@@ -39,8 +40,8 @@ export class MailService {
   }
 
   static generateActivationLink(userId: string, token: string): string {
-    const appUrl ='https://209.38.83.181/v1';
-    return `${appUrl}/auth/activate?userId=${userId}&token=${token}`;
+    const baseUrl = getBaseUrl();
+    return `${baseUrl}/activation.html?userId=${userId}&token=${token}`;
   }
 
   static generateResetPasswordEmail(password: string): string {

@@ -195,6 +195,28 @@ export class Banner {
 
 export const BannerSchema = SchemaFactory.createForClass(Banner);
 
+// Debug middleware để log tất cả operations
+BannerSchema.pre('save', function(next) {
+  console.log('=== MONGOOSE SAVE DEBUG ===');
+  console.log('Document being saved:', {
+    _id: this._id,
+    title: this.title,
+    imageUrl: this.imageUrl,
+    mobileImageUrl: this.mobileImageUrl,
+    targetUrl: this.targetUrl
+  });
+  console.log('=== END SAVE DEBUG ===');
+  next();
+});
+
+BannerSchema.pre('findOneAndUpdate', function(next) {
+  console.log('=== MONGOOSE FINDONEANDUPDATE DEBUG ===');
+  console.log('Update operation:', this.getUpdate());
+  console.log('Query:', this.getQuery());
+  console.log('=== END FINDONEANDUPDATE DEBUG ===');
+  next();
+});
+
 // Index cho performance
 BannerSchema.index({ type: 1, position: 1, order: 1 });
 BannerSchema.index({ isActive: 1, startDate: 1, endDate: 1 });

@@ -1145,7 +1145,7 @@ export class OrdersService {
     }
 
     // Admin có thể hủy đơn hàng ở bất kỳ trạng thái nào, trừ khi đã hoàn thành trả hàng
-    if (order.status === 'return-completed') {
+    if (order.status === 'return') {
       throw new BadRequestException(
         'Không thể hủy đơn hàng đã hoàn thành trả hàng',
       );
@@ -1491,16 +1491,29 @@ export class OrdersService {
   ): Promise<{ data: OrderDocument[]; total: number; pages: number }> {
     const skip = (page - 1) * limit;
 
+    let query: any = {};
+    
+    if (status === 'return') {
+      // Nếu tìm kiếm trạng thái 'return', lấy tất cả đơn hàng có trạng thái 'return' 
+      // và các đơn hàng không thuộc 5 trạng thái cơ bản
+      query.$or = [
+        { status: 'return' },
+        { status: { $nin: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'] } }
+      ];
+    } else {
+      query.status = status;
+    }
+
     const [data, total] = await Promise.all([
       this.orderModel
-        .find({ status })
+        .find(query)
         .populate('idUser', 'name email')
         .populate('items.product', 'name images price')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .exec(),
-      this.orderModel.countDocuments({ status }),
+      this.orderModel.countDocuments(query),
     ]);
 
     return {
@@ -1798,13 +1811,25 @@ export class OrdersService {
   }
 
   async getOrderStatusCounts() {
-    const statuses = ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'];
+    const statuses = ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'return'];
     const counts = {};
 
     // Lấy số lượng đơn hàng cho từng trạng thái
     const countPromises = statuses.map(async (status) => {
-      const count = await this.orderModel.countDocuments({ status });
-      counts[status] = count;
+      if (status === 'return') {
+        // Đối với trạng thái 'return', đếm cả đơn hàng có trạng thái 'return' 
+        // và các đơn hàng không thuộc 5 trạng thái cơ bản
+        const returnCount = await this.orderModel.countDocuments({
+          $or: [
+            { status: 'return' },
+            { status: { $nin: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'] } }
+          ]
+        });
+        counts[status] = returnCount;
+      } else {
+        const count = await this.orderModel.countDocuments({ status });
+        counts[status] = count;
+      }
     });
 
     await Promise.all(countPromises);
@@ -1944,9 +1969,27 @@ export class OrdersService {
 
     // Tìm kiếm theo trạng thái đơn hàng
     if (status) {
-      query.status = status;
-    } else if (statuses && statuses.length > 0) {
-      query.status = { $in: statuses };
+      if (status === 'return') {
+        // Nếu tìm kiếm trạng thái 'return', lấy tất cả đơn hàng có trạng thái 'return' 
+        // và các đơn hàng không thuộc 5 trạng thái cơ bản
+        query.$or = [
+          { status: 'return' },
+          { status: { $nin: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'] } }
+        ];
+      } else {
+        query.status = status;
+      }
+    } else if (statuses) {
+      if (statuses === 'return') {
+        // Nếu tìm kiếm trạng thái 'return', lấy tất cả đơn hàng có trạng thái 'return' 
+        // và các đơn hàng không thuộc 5 trạng thái cơ bản
+        query.$or = [
+          { status: 'return' },
+          { status: { $nin: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'] } }
+        ];
+      } else {
+        query.status = statuses;
+      }
     }
 
     // Tìm kiếm theo trạng thái thanh toán

@@ -230,12 +230,12 @@ export class Order {
   @ApiProperty({
     description: 'Trạng thái đơn hàng',
     example: 'pending',
-    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'return-pending', 'return-approved', 'return-rejected', 'return-processing', 'return-completed'],
+    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'return'],
   })
   @Prop({
     required: true,
     default: 'pending',
-    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'return-pending', 'return-approved', 'return-rejected', 'return-processing', 'return-completed'],
+    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'return'],
   })
   status!: string;
 

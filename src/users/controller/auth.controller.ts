@@ -9,6 +9,7 @@ import {
   UnauthorizedException,
   Query,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { CurrentUser } from 'src/decorators/current-user.decorator';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { LocalAuthGuard } from 'src/guards/local-auth.guard';
@@ -43,6 +44,7 @@ export class AuthController {
     private authService: AuthService,
     private usersService: UsersService,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
   @ApiOperation({
@@ -264,12 +266,18 @@ export class AuthController {
     }
 
     try {
+      const jwtSecret = this.configService.get<string>('JWT_ACCESS_SECRET');
+
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: process.env.JWT_ACCESS_SECRET,
+        secret: jwtSecret,
       });
 
-      if (payload.sub !== userId || payload.type !== 'activation') {
-        throw new BadRequestException('Token không hợp lệ');
+      if (payload.sub !== userId) {
+        throw new BadRequestException('Token không hợp lệ - User ID mismatch');
+      }
+
+      if (payload.type !== 'activation') {
+        throw new BadRequestException('Token không hợp lệ - Wrong token type');
       }
 
       const user = await this.usersService.findById(userId);
@@ -281,9 +289,13 @@ export class AuthController {
         return { success: true, message: 'Tài khoản đã được kích hoạt' };
       }
 
-      await this.usersService.update(userId, { isActive: true });
+      // Sử dụng method riêng cho việc kích hoạt tài khoản
+      await this.usersService.activateAccount(userId);
       return { success: true, message: 'Kích hoạt tài khoản thành công' };
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn');
     }
   }

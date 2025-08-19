@@ -225,11 +225,11 @@ export class CreateOrderAdminDto {
   @ApiProperty({
     description: 'Trạng thái đơn hàng',
     example: 'pending',
-    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'],
+    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'return'],
     required: false,
   })
   @IsOptional()
-  @IsEnum(['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'])
+  @IsEnum(['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'return'])
   status?: string;
 
   @ApiProperty({
@@ -332,11 +332,11 @@ export class CreateOrderGuestDto {
   @ApiProperty({
     description: 'Trạng thái đơn hàng',
     example: 'confirmed',
-    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'],
+    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'return'],
     required: false,
   })
   @IsOptional()
-  @IsEnum(['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'])
+  @IsEnum(['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'return'])
   status?: string;
 
   @ApiProperty({

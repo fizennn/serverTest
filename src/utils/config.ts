@@ -14,3 +14,7 @@ export const corsConfig = (): CorsOptions => ({
   methods: 'GET, POST, OPTIONS, PUT, PATCH, DELETE',
   credentials: true,
 });
+
+export const getBaseUrl = (): string => {
+  return process.env.BASE_URL || 'https://209.38.83.181';
+};

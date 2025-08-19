@@ -124,10 +124,10 @@ export class ReturnOrdersService {
         variant: orderItem.variant || '',
       });
 
-      // Cập nhật status của item trong order thành 'return-pending'
-      console.log(`Updating item ${returnItem.itemId} status to return-pending`);
+      // Cập nhật status của item trong order thành 'return'
+      console.log(`Updating item ${returnItem.itemId} status to return`);
       console.log('Original item status:', order.items[orderItemIndex].status);
-      order.items[orderItemIndex].status = 'return-pending';
+      order.items[orderItemIndex].status = 'return';
       console.log('Updated item status:', order.items[orderItemIndex].status);
     }
 
@@ -142,9 +142,9 @@ export class ReturnOrdersService {
       images: returnOrderDto.images || [],
     });
 
-    // Cập nhật trạng thái đơn hàng gốc thành return-pending và lưu thay đổi
-    console.log('Updating order status to return-pending');
-    order.status = 'return-pending';
+    // Cập nhật trạng thái đơn hàng gốc thành return và lưu thay đổi
+    console.log('Updating order status to return');
+    order.status = 'return';
     
     console.log('Before save - items status:', order.items.map(item => item.status));
     
@@ -370,16 +370,8 @@ export class ReturnOrdersService {
       if (returnItemIds.includes(itemId)) {
         console.log(`Updating item ${itemId} status to ${updateData.status}`);
         
-        // Cập nhật status của item dựa trên trạng thái return
-        if (updateData.status === 'approved') {
-          order.items[i].status = 'return-approved';
-        } else if (updateData.status === 'processing') {
-          order.items[i].status = 'return-processing';
-        } else if (updateData.status === 'completed') {
-          order.items[i].status = 'return-completed';
-        } else if (updateData.status === 'rejected') {
-          order.items[i].status = 'return-rejected';
-        }
+        // Cập nhật status của item thành return cho tất cả các trạng thái return
+        order.items[i].status = 'return';
       }
     }
 
@@ -387,9 +379,9 @@ export class ReturnOrdersService {
       console.log(
         `Đã chấp nhận trả hàng với số tiền: ${returnRequest.totalRefundAmount}`,
       );
-      // Cập nhật trạng thái đơn hàng gốc thành return-approved
-      console.log('Updating order status to return-approved');
-      order.status = 'return-approved';
+      // Cập nhật trạng thái đơn hàng gốc thành return
+      console.log('Updating order status to return');
+      order.status = 'return';
       
       // Lưu thay đổi order
       await (order as any).save();
@@ -397,19 +389,19 @@ export class ReturnOrdersService {
       console.log('Order saved successfully');
       console.log('Đã chấp nhận trả hàng và cập nhật trạng thái đơn hàng');
     } else if (updateData.status === 'processing') {
-      // Cập nhật trạng thái đơn hàng gốc thành return-processing
-      order.status = 'return-processing';
+      // Cập nhật trạng thái đơn hàng gốc thành return
+      order.status = 'return';
       await (order as any).save();
       console.log('Đang xử lý trả hàng');
     } else if (updateData.status === 'completed') {
       await this.restoreProductStock(returnRequest);
-      // Cập nhật trạng thái đơn hàng gốc thành return-completed
-      order.status = 'return-completed';
+      // Cập nhật trạng thái đơn hàng gốc thành return
+      order.status = 'return';
       await (order as any).save();
       console.log('Đã hoàn thành trả hàng và cập nhật tồn kho');
     } else if (updateData.status === 'rejected') {
-      // Cập nhật trạng thái đơn hàng gốc thành return-rejected
-      order.status = 'return-rejected';
+      // Cập nhật trạng thái đơn hàng gốc thành return
+      order.status = 'return';
       await (order as any).save();
       console.log('Đã từ chối yêu cầu trả hàng');
     }

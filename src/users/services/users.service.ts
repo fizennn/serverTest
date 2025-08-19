@@ -58,7 +58,7 @@ export class UsersService {
       // Tạo token kích hoạt
       const activationToken = this.jwtService.sign(
         { sub: newUser._id, type: 'activation' },
-        { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '10y' },
+        { expiresIn: '10y' },
       );
 
       const res = await this.mailService.sendActivationEmail(
@@ -1072,6 +1072,30 @@ export class UsersService {
     } catch (error) {
       this.logger.error(`Failed to get roles: ${error.message}`);
       throw new BadRequestException('Failed to get roles');
+    }
+  }
+
+  // Method riêng cho việc kích hoạt tài khoản
+  async activateAccount(userId: string): Promise<UserDocument> {
+    try {
+      const updatedUser = await this.userModel
+        .findByIdAndUpdate(
+          userId, 
+          { isActive: true }, 
+          { new: true, runValidators: true }
+        )
+        .populate({
+          path: 'roleId',
+          select: 'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt',
+        });
+
+      if (!updatedUser) {
+        throw new NotFoundException(`User with ID ${userId} not found`);
+      }
+
+      return updatedUser;
+    } catch (error: any) {
+      throw new BadRequestException('Failed to activate account');
     }
   }
 }

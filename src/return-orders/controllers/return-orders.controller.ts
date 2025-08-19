@@ -38,7 +38,7 @@ export class ReturnOrdersController {
   @ApiOperation({
     summary: 'Tạo yêu cầu trả hàng',
     description:
-      'Khách hàng tạo yêu cầu trả hàng cho đơn hàng đã giao thành công. Chỉ có thể trả hàng trong vòng 7 ngày sau khi giao hàng thành công. Trạng thái đơn hàng sẽ được cập nhật thành "return-pending". Mỗi item cần có itemId để xác định chính xác item nào trong order cần trả.',
+      'Khách hàng tạo yêu cầu trả hàng cho đơn hàng đã giao thành công. Chỉ có thể trả hàng trong vòng 7 ngày sau khi giao hàng thành công. Trạng thái đơn hàng sẽ được cập nhật thành "return". Mỗi item cần có itemId để xác định chính xác item nào trong order cần trả.',
   })
   @ApiParam({ name: 'orderId', description: 'ID đơn hàng' })
   @ApiResponse({ status: 201, description: 'Tạo yêu cầu trả hàng thành công' })
@@ -236,7 +236,7 @@ export class ReturnOrdersController {
   @ApiOperation({
     summary: 'Cập nhật trạng thái yêu cầu trả hàng (Admin)',
     description:
-      'Admin cập nhật trạng thái yêu cầu trả hàng và xử lý hoàn tiền. Trạng thái đơn hàng sẽ được cập nhật tương ứng: approved→return-approved, processing→return-processing, completed→return-completed, rejected→return-rejected.',
+      'Admin cập nhật trạng thái yêu cầu trả hàng và xử lý hoàn tiền. Trạng thái đơn hàng sẽ được cập nhật thành "return" cho tất cả các trạng thái return.',
   })
   @ApiParam({ name: 'id', description: 'ID yêu cầu trả hàng' })
   @ApiResponse({ status: 200, description: 'Cập nhật trạng thái thành công' })

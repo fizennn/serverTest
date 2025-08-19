@@ -16,7 +16,8 @@ export enum OrderStatus {
   CONFIRMED = 'confirmed',
   SHIPPING = 'shipping',
   DELIVERED = 'delivered',
-  CANCELLED = 'cancelled'
+  CANCELLED = 'cancelled',
+  RETURN = 'return'
 }
 
 export enum SortField {
@@ -168,16 +169,14 @@ export class AdvancedSearchOrderDto {
   limit?: number;
 
   @ApiProperty({
-    description: 'Danh sách trạng thái đơn hàng (cho phép tìm kiếm nhiều trạng thái)',
-    type: [String],
+    description: 'Trạng thái đơn hàng thứ hai (cho phép tìm kiếm nhiều trạng thái)',
     enum: OrderStatus,
-    example: [OrderStatus.PENDING, OrderStatus.CONFIRMED],
+    example: OrderStatus.CONFIRMED,
     required: false
   })
   @IsOptional()
-  @IsArray()
-  @IsEnum(OrderStatus, { each: true })
-  statuses?: OrderStatus[];
+  @IsEnum(OrderStatus)
+  statuses?: OrderStatus;
 }
 
 export class SearchOrderResponseDto {

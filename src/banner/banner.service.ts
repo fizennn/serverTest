@@ -223,11 +223,26 @@ export class BannersService {
     updateBannerDto: UpdateBannerDto,
     updatedById: string,
   ): Promise<BannerDocument> {
+    console.log('Service update:', { id, dto: updateBannerDto });
+
+    // Kiểm tra banner có tồn tại không
+    const existingBanner = await this.bannerModel.findById(id);
+    if (!existingBanner) {
+      console.log('ERROR: Banner not found');
+      throw new NotFoundException('Không tìm thấy banner');
+    }
+
+    console.log('Existing banner:', {
+      imageUrl: existingBanner.imageUrl,
+      mobileImageUrl: existingBanner.mobileImageUrl
+    });
+
     // Validate dates if provided
     if (updateBannerDto.startDate && updateBannerDto.endDate) {
       const startDate = new Date(updateBannerDto.startDate);
       const endDate = new Date(updateBannerDto.endDate);
       if (startDate >= endDate) {
+        console.log('ERROR: Invalid date range');
         throw new BadRequestException('Ngày kết thúc phải sau ngày bắt đầu');
       }
     }
@@ -237,6 +252,22 @@ export class BannersService {
       this.validateTargetUrl(
         updateBannerDto.linkType,
         updateBannerDto.targetUrl,
+      );
+    }
+
+    // Validate target URL if only targetUrl is provided but linkType is not
+    if (updateBannerDto.targetUrl && !updateBannerDto.linkType) {
+      this.validateTargetUrl(
+        existingBanner.linkType,
+        updateBannerDto.targetUrl,
+      );
+    }
+
+    // Validate linkType if only linkType is provided but targetUrl is not
+    if (updateBannerDto.linkType && !updateBannerDto.targetUrl) {
+      this.validateTargetUrl(
+        updateBannerDto.linkType,
+        existingBanner.targetUrl,
       );
     }
 
@@ -252,14 +283,28 @@ export class BannersService {
       updateData.endDate = new Date(updateBannerDto.endDate);
     }
 
+    console.log('Update data:', updateData);
+
+    // Thực hiện cập nhật
+    console.log('Executing database update');
     const banner = await this.bannerModel
       .findByIdAndUpdate(id, updateData, { new: true })
       .populate('createdBy', 'name email')
       .populate('lastUpdatedBy', 'name email');
+    
+    console.log('Database update done');
 
     if (!banner) {
+      console.log('ERROR: Banner not found after update');
       throw new NotFoundException('Không tìm thấy banner');
     }
+
+    console.log('Banner after update:', {
+      imageUrl: banner.imageUrl,
+      mobileImageUrl: banner.mobileImageUrl
+    });
+
+    console.log('Update completed');
 
     return banner;
   }

@@ -475,15 +475,15 @@ export class OrdersController {
     name: 'status',
     required: false,
     description: 'Trạng thái đơn hàng',
-    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'],
+    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'return'],
     example: 'pending',
   })
   @ApiQuery({
     name: 'statuses',
     required: false,
-    description: 'Danh sách trạng thái đơn hàng (cho phép tìm kiếm nhiều trạng thái)',
-    type: [String],
-    example: ['pending', 'confirmed'],
+    description: 'Trạng thái đơn hàng thứ hai (thay thế cho status)',
+    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'return'],
+    example: 'confirmed',
   })
   @ApiQuery({
     name: 'paymentStatus',
@@ -574,7 +574,7 @@ export class OrdersController {
   @ApiParam({
     name: 'status',
     description: 'Trạng thái đơn hàng',
-    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled'],
+    enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'return'],
   })
   @ApiQuery({
     name: 'page',
@@ -986,7 +986,7 @@ export class OrdersController {
   @Get('stats/status-counts')
   @ApiOperation({
     summary: 'Lấy tổng số đơn hàng theo từng trạng thái (Admin)',
-    description: 'Lấy thống kê tổng số đơn hàng theo từng trạng thái: pending, confirmed, shipping, delivered, cancelled',
+    description: 'Lấy thống kê tổng số đơn hàng theo từng trạng thái: pending, confirmed, shipping, delivered, cancelled, return',
   })
   @ApiResponse({
     status: 200,
@@ -999,7 +999,8 @@ export class OrdersController {
         shipping: { type: 'number', example: 12, description: 'Số đơn hàng đang vận chuyển' },
         delivered: { type: 'number', example: 45, description: 'Số đơn hàng đã giao thành công' },
         cancelled: { type: 'number', example: 3, description: 'Số đơn hàng đã hủy' },
-        total: { type: 'number', example: 83, description: 'Tổng số đơn hàng' }
+        return: { type: 'number', example: 2, description: 'Số đơn hàng trả hàng' },
+        total: { type: 'number', example: 85, description: 'Tổng số đơn hàng' }
       }
     }
   })

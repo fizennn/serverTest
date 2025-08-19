@@ -89,18 +89,45 @@ export class AnalyticsService {
       shipping: 0,
       delivered: 0,
       cancelled: 0,
-      'return-pending': 0,
-      'return-approved': 0,
-      'return-processing': 0,
-      'return-completed': 0,
-      'return-rejected': 0,
+      'return': 0,
     };
 
+    // Xử lý thống kê trạng thái với logic đặc biệt cho 'return'
     statusStats.forEach(stat => {
       if (orderStatusStats.hasOwnProperty(stat._id)) {
         orderStatusStats[stat._id] = stat.count;
       }
     });
+
+    // Tính toán trạng thái 'return' đặc biệt: bao gồm cả đơn hàng có trạng thái 'return' 
+    // và các đơn hàng không thuộc 5 trạng thái cơ bản
+    const returnStats = await this.orderModel.aggregate([
+      { $match: matchCondition },
+      {
+        $group: {
+          _id: null,
+          returnCount: {
+            $sum: {
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ['$status', 'return'] },
+                    { $not: { $in: ['$status', ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled']] } }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+
+    // Cập nhật số lượng cho trạng thái 'return'
+    if (returnStats.length > 0) {
+      orderStatusStats['return'] = returnStats[0].returnCount;
+    }
 
     if (!overviewStats) {
       return {
@@ -608,6 +635,8 @@ export class AnalyticsService {
         case 'delivered':
           deliveredOrders = stat.count;
           break;
+        // Trạng thái 'return' và các trạng thái khác không thuộc 5 trạng thái cơ bản
+        // sẽ được tính vào totalOrders nhưng không hiển thị riêng trong dashboard
       }
     });
 

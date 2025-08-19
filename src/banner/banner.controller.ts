@@ -133,17 +133,62 @@ export class BannersController {
   @Put(':id')
   @ApiOperation({ 
     summary: 'Cập nhật banner (Admin only)',
-    description: 'Chỉ admin mới có thể cập nhật banner'
+    description: 'Chỉ admin mới có thể cập nhật banner. Có thể cập nhật một hoặc nhiều trường.'
   })
   @ApiParam({ name: 'id', description: 'ID banner' })
-  @ApiResponse({ status: 200, description: 'Cập nhật banner thành công' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Cập nhật banner thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        _id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+        title: { type: 'string', example: 'Khuyến mãi Black Friday - Giảm đến 50%' },
+        description: { type: 'string', example: 'Cơ hội duy nhất trong năm!' },
+        imageUrl: { type: 'string', example: 'https://example.com/banner.jpg' },
+        mobileImageUrl: { type: 'string', example: 'https://example.com/banner-mobile.jpg' },
+        linkType: { type: 'string', example: 'web', enum: ['web', 'deeplink', 'internal'] },
+        targetUrl: { type: 'string', example: 'https://example.com/promotion' },
+        type: { type: 'string', example: 'promotion' },
+        position: { type: 'string', example: 'top' },
+        order: { type: 'number', example: 1 },
+        isActive: { type: 'boolean', example: true },
+        startDate: { type: 'string', format: 'date-time' },
+        endDate: { type: 'string', format: 'date-time' },
+        clickCount: { type: 'number', example: 0 },
+        viewCount: { type: 'number', example: 0 },
+        tags: { type: 'array', items: { type: 'string' } },
+        openInNewTab: { type: 'boolean', example: false },
+        createdBy: { type: 'object' },
+        lastUpdatedBy: { type: 'object' },
+        createdAt: { type: 'string', format: 'date-time' },
+        updatedAt: { type: 'string', format: 'date-time' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
   @ApiResponse({ status: 403, description: 'Chỉ admin mới có thể cập nhật banner' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy banner' })
   async updateBanner(
     @Param('id') id: string, 
     @Body() updateBannerDto: UpdateBannerDto,
-    @CurrentUser() user: UserDocument
+    @CurrentUser() user: UserDocument,
+    @Req() req: Request
   ) {
+    console.log('=== RAW REQUEST DEBUG ===');
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('Content-Length:', req.headers['content-length']);
+    console.log('Method:', req.method);
+    console.log('URL:', req.url);
+    console.log('Raw body type:', typeof req.body);
+    console.log('Raw body:', req.body);
+    console.log('Raw body stringified:', JSON.stringify(req.body));
+    console.log('Has rawBody:', !!(req as any).rawBody);
+    console.log('RawBody:', (req as any).rawBody);
+    console.log('Parsed DTO:', updateBannerDto);
+    console.log('DTO keys:', Object.keys(updateBannerDto));
+    console.log('=== END RAW REQUEST DEBUG ===');
+    
     return this.bannersService.update(id, updateBannerDto, user._id.toString());
   }
 
