@@ -265,12 +265,32 @@ export class ReturnOrdersService {
 
     console.log('Found return orders:', data.length);
     console.log('Total count:', total);
+    console.log('Total type:', typeof total);
+    console.log('Limit:', limit);
+    console.log('Limit type:', typeof limit);
 
-    return {
+    // Đảm bảo total và limit là số hợp lệ
+    const validTotal = typeof total === 'number' ? total : 0;
+    const validLimit = typeof limit === 'number' && limit > 0 ? limit : 10;
+    
+    const calculatedPages = validLimit > 0 ? Math.ceil(validTotal / validLimit) : 0;
+
+    console.log('Valid total:', validTotal);
+    console.log('Valid limit:', validLimit);
+    console.log('Calculated pages:', calculatedPages);
+    console.log('Total / limit:', validTotal / validLimit);
+    
+    const result = {
       data,
-      total,
-      pages: Math.ceil(total / limit),
+      total: validTotal,
+      pages: calculatedPages,
     };
+
+    console.log('Return result:', JSON.stringify(result, null, 2));
+    console.log('Result.pages:', result.pages);
+    console.log('Result.pages type:', typeof result.pages);
+
+    return result;
   }
 
   async getAllReturnRequests(
@@ -294,10 +314,16 @@ export class ReturnOrdersService {
       this.returnOrderModel.countDocuments(filter),
     ]);
 
+    // Đảm bảo total và limit là số hợp lệ
+    const validTotal = typeof total === 'number' ? total : 0;
+    const validLimit = typeof limit === 'number' && limit > 0 ? limit : 10;
+    
+    const calculatedPages = validLimit > 0 ? Math.ceil(validTotal / validLimit) : 0;
+    
     return {
       data,
-      total,
-      pages: Math.ceil(total / limit),
+      total: validTotal,
+      pages: calculatedPages,
     };
   }
 

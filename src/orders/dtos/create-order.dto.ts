@@ -348,4 +348,4 @@ export class CreateOrderGuestDto {
   @IsOptional()
   @IsEnum(['unpaid', 'paid', 'refunded'])
   paymentStatus?: string;
-} 
+}

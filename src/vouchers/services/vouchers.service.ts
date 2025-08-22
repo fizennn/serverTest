@@ -604,8 +604,31 @@ export class VouchersService {
   }
 
   async returnVoucherUsage(voucherId: string, userId: string): Promise<Voucher> {
-    // Alias cho removeUserFromVoucher để hoàn trả voucher khi hủy đơn hàng
-    return this.removeUserFromVoucher(voucherId, userId);
+    // Trả voucher về cho user khi hủy đơn hàng (không tăng stock)
+    return this.returnVoucherToUser(voucherId, userId);
+  }
+
+  async returnVoucherToUser(voucherId: string, userId: string): Promise<Voucher> {
+    if (!Types.ObjectId.isValid(voucherId) || !Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid ID');
+    }
+
+    const voucher = await this.voucherModel.findById(voucherId).exec();
+    if (!voucher) {
+      throw new NotFoundException('Voucher not found');
+    }
+
+    const userObjectId = new Types.ObjectId(userId);
+    
+    // Kiểm tra xem user đã có trong danh sách chưa
+    if (voucher.userId.some(id => id.equals(userObjectId))) {
+      throw new BadRequestException('User already has access to this voucher');
+    }
+
+    // Thêm user vào voucher (không thay đổi stock vì đây là trả lại voucher đã sử dụng)
+    voucher.userId.push(userObjectId);
+
+    return await voucher.save();
   }
 
   async checkVoucherValidity(voucherId: string, userId: string, amount: number): Promise<{ valid: boolean; discount: number; message?: string }> {

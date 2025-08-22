@@ -17,6 +17,7 @@ import { Product } from '../../products/schemas/product.schema';
 import { Voucher } from '../../vouchers/schemas/voucher.schema';
 import { ProductsService } from '../../products/services/products.service';
 import { VouchersService } from '../../vouchers/services/vouchers.service';
+import { UsersService } from '../../users/services/users.service';
 import { PayOSService } from '../../payOS/services/payOS.service';
 import { NotificationService } from '../../notifications/notifications.service';
 import { AdvancedSearchOrderDto, PaginatedSearchOrderResponseDto, SortField, SortOrder } from '../dtos/search-order.dto';
@@ -32,6 +33,7 @@ export class OrdersService {
     @InjectModel(Voucher.name) private voucherModel: Model<Voucher>,
     private productsService: ProductsService,
     private vouchersService: VouchersService,
+    private usersService: UsersService,
     @Inject(forwardRef(() => PayOSService))
     private payOSService: PayOSService,
     private notificationService: NotificationService,
@@ -291,11 +293,6 @@ export class OrdersService {
         };
 
         orderVouchers.push(orderVoucher);
-
-        // Giảm stock của voucher
-        await this.voucherModel.findByIdAndUpdate(voucherId, {
-          $inc: { stock: -1 },
-        });
       }
     }
 
@@ -362,6 +359,19 @@ export class OrdersService {
         .exec();
 
       console.log('Populated order vouchers:', populatedOrder.vouchers);
+      
+      // Xóa voucher khỏi user sau khi tạo đơn hàng thành công
+      if (vouchers && vouchers.length > 0) {
+        for (const voucherId of vouchers) {
+          try {
+            await this.usersService.removeVoucherFromUser(userId, voucherId, this.vouchersService);
+            console.log(`Đã xóa voucher ${voucherId} khỏi user ${userId}`);
+          } catch (error) {
+            console.error(`Lỗi khi xóa voucher ${voucherId} khỏi user ${userId}:`, error);
+            // Không throw error để không ảnh hưởng đến việc tạo đơn hàng
+          }
+        }
+      }
       
       // Gửi thông báo cho admin khi có đơn hàng mới
       try {
@@ -553,11 +563,6 @@ export class OrdersService {
         };
 
         orderVouchers.push(orderVoucher);
-
-        // Giảm stock của voucher
-        await this.voucherModel.findByIdAndUpdate(voucherId, {
-          $inc: { stock: -1 },
-        });
       }
     }
 
@@ -625,6 +630,19 @@ export class OrdersService {
         .exec();
 
       console.log('Populated admin order vouchers:', populatedOrder.vouchers);
+      
+      // Xóa voucher khỏi user sau khi tạo đơn hàng thành công
+      if (vouchers && vouchers.length > 0) {
+        for (const voucherId of vouchers) {
+          try {
+            await this.usersService.removeVoucherFromUser(userId, voucherId, this.vouchersService);
+            console.log(`Đã xóa voucher ${voucherId} khỏi user ${userId}`);
+          } catch (error) {
+            console.error(`Lỗi khi xóa voucher ${voucherId} khỏi user ${userId}:`, error);
+            // Không throw error để không ảnh hưởng đến việc tạo đơn hàng
+          }
+        }
+      }
       
       // Gửi thông báo cho admin khi có đơn hàng mới được tạo bởi admin
       try {
@@ -765,61 +783,10 @@ export class OrdersService {
     // Tính toán phí ship dựa trên atStore
     const finalShipCost = atStore ? 0 : (shipCost || 0);
 
-    // Tính toán discount từ voucher
-    let itemDiscount = 0; // Giảm giá cho sản phẩm
-    let shipDiscount = 0; // Giảm giá cho phí vận chuyển
-    const orderVouchers = [];
-
-    if (vouchers && vouchers.length > 0) {
-      for (const voucherId of vouchers) {
-        if (!Types.ObjectId.isValid(voucherId)) {
-          throw new BadRequestException(`Invalid voucher ID: ${voucherId}`);
-        }
-
-        // Lấy thông tin voucher từ database
-        const voucher = await this.voucherModel.findById(voucherId);
-        if (!voucher) {
-          throw new BadRequestException(`Voucher not found: ${voucherId}`);
-        }
-
-        // Sử dụng VouchersService để tính toán discount
-        const voucherResult =
-          await this.vouchersService.calculateVoucherDiscount(
-            voucherId,
-            null, // Không có userId cho guest
-            subtotal,
-            finalShipCost,
-          );
-
-        if (!voucherResult.valid) {
-          throw new BadRequestException(
-            `Voucher ${voucherId}: ${voucherResult.message}`,
-          );
-        }
-
-        // Cộng dồn discount
-        itemDiscount += voucherResult.itemDiscount;
-        shipDiscount += voucherResult.shipDiscount;
-
-        // Tạo snapshot voucher cho order
-        const orderVoucher = {
-          voucherId: voucherId,
-          type: voucher.type,
-          disCount: voucher.disCount,
-          condition: voucher.condition,
-          limit: voucher.limit,
-          appliedDiscount:
-            voucherResult.itemDiscount + voucherResult.shipDiscount,
-        };
-
-        orderVouchers.push(orderVoucher);
-
-        // Giảm stock của voucher
-        await this.voucherModel.findByIdAndUpdate(voucherId, {
-          $inc: { stock: -1 },
-        });
-      }
-    }
+    // Guest không sử dụng voucher
+    const itemDiscount = 0; // Không có giảm giá cho sản phẩm
+    const shipDiscount = 0; // Không có giảm giá cho phí vận chuyển
+    const orderVouchers = []; // Không có voucher
 
     // Tính tổng tiền cuối cùng
     const total = subtotal - itemDiscount + (finalShipCost - shipDiscount);
@@ -1161,12 +1128,8 @@ export class OrdersService {
               voucherInfo.voucherId.toString(),
               order.idUser.toString(),
             );
-          } else {
-            // Nếu là guest order, chỉ tăng stock của voucher
-            await this.voucherModel.findByIdAndUpdate(voucherInfo.voucherId, {
-              $inc: { stock: 1 },
-            });
           }
+          // Nếu là guest order, không cần làm gì vì guest không có user account
         } catch (error) {
           console.error('Lỗi khi hoàn trả voucher:', error);
           // Không throw error để không ảnh hưởng đến việc hủy đơn hàng

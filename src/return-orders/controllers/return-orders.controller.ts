@@ -145,11 +145,34 @@ export class ReturnOrdersController {
       throw new BadRequestException('Số lượng item trên trang không hợp lệ');
     }
 
-    return this.returnOrdersService.getCustomerReturnRequests(
+    const result = await this.returnOrdersService.getCustomerReturnRequests(
       userId,
       pageNumber,
       limitNumber,
     );
+
+    console.log('=== SERVICE RESULT ===');
+    console.log('Result:', JSON.stringify(result, null, 2));
+    console.log('Result type:', typeof result);
+    console.log('Result.pages:', result.pages);
+    console.log('Result.pages type:', typeof result.pages);
+    console.log('Result.total:', result.total);
+    console.log('Result.total type:', typeof result.total);
+    console.log('Result.limit:', limitNumber);
+
+    // Đảm bảo response có đúng format
+    const response = {
+      data: result.data || [],
+      total: result.total || 0,
+      pages: result.pages || 0
+    };
+
+    console.log('=== FINAL RESPONSE ===');
+    console.log('Response:', JSON.stringify(response, null, 2));
+    console.log('Response.pages:', response.pages);
+    console.log('Response.pages type:', typeof response.pages);
+
+    return response;
   }
 
   @UseGuards(JwtAuthGuard)
@@ -228,7 +251,16 @@ export class ReturnOrdersController {
     @Query('limit') limit?: number,
     @Query('status') status?: string,
   ) {
-    return this.returnOrdersService.getAllReturnRequests(page, limit, status);
+    const result = await this.returnOrdersService.getAllReturnRequests(page, limit, status);
+    
+    // Đảm bảo response có đúng format
+    const response = {
+      data: result.data || [],
+      total: result.total || 0,
+      pages: result.pages || 0
+    };
+
+    return response;
   }
 
   @UseGuards(AdminGuard)
