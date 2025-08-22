@@ -1997,6 +1997,27 @@ export class OrdersService {
       query.paymentStatus = paymentStatus;
     }
 
+    // Tìm kiếm theo atStore
+    if (atStore !== undefined) {
+      query.atStore = atStore;
+    }
+
+    // Tìm kiếm theo phương thức thanh toán
+    if (payment) {
+      query.payment = payment;
+    }
+
+    // Tìm kiếm theo khoảng giá
+    if (minTotal !== undefined || maxTotal !== undefined) {
+      query.total = {};
+      if (minTotal !== undefined) {
+        query.total.$gte = minTotal;
+      }
+      if (maxTotal !== undefined) {
+        query.total.$lte = maxTotal;
+      }
+    }
+
     // Tìm kiếm theo khoảng thời gian
     if (startDate || endDate) {
       query.createdAt = {};
@@ -2013,7 +2034,7 @@ export class OrdersService {
       this.orderModel.find(query)
         .populate('idUser', 'name email phone')
         .populate('items.product', 'name price images')
-        .sort({ createdAt: -1 })
+        .sort({ [sortBy]: sortOrder === SortOrder.ASC ? 1 : -1 })
         .skip(skip)
         .limit(limit)
         .exec(),
