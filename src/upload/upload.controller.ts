@@ -16,7 +16,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiConsumes, ApiBody, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { UploadService } from './upload.service';
-import { CreateUploadDto, UpdateUploadDto, UploadResponseDto } from './dtos/upload.dto';
+import { CreateUploadDto, UpdateUploadDto, UploadResponseDto, PaginatedUploadResponseDto } from './dtos/upload.dto';
 import { JwtAuthGuard } from '@/guards/jwt-auth.guard';
 import { CurrentUser } from '@/decorators/current-user.decorator';
 import { UserDocument } from '@/users/schemas/user.schema';
@@ -150,7 +150,7 @@ export class UploadController {
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Lấy danh sách upload thành công',
-    type: [UploadResponseDto],
+    type: PaginatedUploadResponseDto,
   })
   async findAll(@Query() query: any) {
     return await this.uploadService.findAll(query);
@@ -167,14 +167,16 @@ export class UploadController {
 
   @Get('tags/:tags')
   @ApiParam({ name: 'tags', description: 'Tags cần tìm (phân cách bằng dấu phẩy)', example: 'product,banner' })
+  @ApiQuery({ name: 'page', required: false, description: 'Trang hiện tại', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, description: 'Số lượng item mỗi trang', example: 10 })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Lấy files theo tags thành công',
-    type: [UploadResponseDto],
+    type: PaginatedUploadResponseDto,
   })
-  async findByTags(@Param('tags') tags: string) {
+  async findByTags(@Param('tags') tags: string, @Query() query: any) {
     const tagArray = tags.split(',').map(tag => tag.trim());
-    return await this.uploadService.findByTags(tagArray);
+    return await this.uploadService.findByTags(tagArray, query);
   }
 
   @Get(':id')
@@ -314,5 +316,36 @@ export class UploadController {
   })
   async fixFilePaths() {
     return await this.uploadService.fixFilePaths();
+  }
+
+  @Get('test/static/:filename')
+  @ApiParam({ name: 'filename', description: 'Tên file cần test' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Test static file serving',
+  })
+  async testStaticFile(@Param('filename') filename: string) {
+    const fs = require('fs');
+    const path = require('path');
+    
+    const uploadsDir = path.join(process.cwd(), 'uploads');
+    const filePath = path.join(uploadsDir, filename);
+    
+    const exists = fs.existsSync(filePath);
+    const stats = exists ? fs.statSync(filePath) : null;
+    
+    return {
+      filename,
+      exists,
+      filePath,
+      uploadsDir,
+      stats: exists ? {
+        size: stats.size,
+        created: stats.birthtime,
+        modified: stats.mtime
+      } : null,
+      url: this.uploadService.generateFileUrl(filename),
+      currentDir: process.cwd()
+    };
   }
 }

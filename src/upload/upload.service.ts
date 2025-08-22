@@ -60,7 +60,7 @@ export class UploadService {
     return await upload.save();
   }
 
-  async findAll(query: any = {}): Promise<UploadDocument[]> {
+  async findAll(query: any = {}): Promise<{ data: UploadDocument[], total: number, pages: number, currentPage: number, limit: number }> {
     const { page = 1, limit = 10, tags, isActive, search } = query;
     
     let filter: any = {};
@@ -84,13 +84,30 @@ export class UploadService {
     }
 
     const skip = (page - 1) * limit;
+    const limitNum = parseInt(limit);
+    const pageNum = parseInt(page);
     
-    return await this.uploadModel
+    // Lấy tổng số records
+    const total = await this.uploadModel.countDocuments(filter).exec();
+    
+    // Lấy danh sách records
+    const data = await this.uploadModel
       .find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit))
+      .limit(limitNum)
       .exec();
+    
+    // Tính toán thông tin phân trang
+    const pages = Math.ceil(total / limitNum);
+    
+    return {
+      data,
+      total,
+      pages,
+      currentPage: pageNum,
+      limit: limitNum
+    };
   }
 
   async findOne(id: string): Promise<UploadDocument> {
@@ -180,11 +197,35 @@ export class UploadService {
     };
   }
 
-  async findByTags(tags: string[]): Promise<UploadDocument[]> {
-    return await this.uploadModel
-      .find({ tags: { $in: tags }, isActive: true })
+  async findByTags(tags: string[], query: any = {}): Promise<{ data: UploadDocument[], total: number, pages: number, currentPage: number, limit: number }> {
+    const { page = 1, limit = 10 } = query;
+    
+    const filter = { tags: { $in: tags }, isActive: true };
+    const skip = (page - 1) * limit;
+    const limitNum = parseInt(limit);
+    const pageNum = parseInt(page);
+    
+    // Lấy tổng số records
+    const total = await this.uploadModel.countDocuments(filter).exec();
+    
+    // Lấy danh sách records
+    const data = await this.uploadModel
+      .find(filter)
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
       .exec();
+    
+    // Tính toán thông tin phân trang
+    const pages = Math.ceil(total / limitNum);
+    
+    return {
+      data,
+      total,
+      pages,
+      currentPage: pageNum,
+      limit: limitNum
+    };
   }
 
   async fixFilePaths(): Promise<{ fixed: number; total: number }> {

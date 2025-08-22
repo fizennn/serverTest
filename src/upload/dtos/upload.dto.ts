@@ -98,4 +98,36 @@ export class UploadResponseDto {
     example: '2024-01-15T10:30:00.000Z'
   })
   updatedAt: Date;
+}
+
+export class PaginatedUploadResponseDto {
+  @ApiProperty({
+    description: 'Danh sách upload records',
+    type: [UploadResponseDto]
+  })
+  data: UploadResponseDto[];
+
+  @ApiProperty({
+    description: 'Tổng số records',
+    example: 25
+  })
+  total: number;
+
+  @ApiProperty({
+    description: 'Tổng số trang',
+    example: 3
+  })
+  pages: number;
+
+  @ApiProperty({
+    description: 'Trang hiện tại',
+    example: 1
+  })
+  currentPage: number;
+
+  @ApiProperty({
+    description: 'Số lượng items mỗi trang',
+    example: 10
+  })
+  limit: number;
 } 
