@@ -16,8 +16,8 @@ export class ReviewsService {
 
   async create(reviewDto: ReviewDto): Promise<Review> {
     // Kiểm tra product tồn tại
-    const productExists = await this.productModel.exists({ _id: reviewDto.product });
-    if (!productExists) {
+    const product = await this.productModel.findById(reviewDto.product);
+    if (!product) {
       throw new NotFoundException('Product không tồn tại');
     }
     // Kiểm tra tất cả user trong comments
@@ -52,6 +52,10 @@ export class ReviewsService {
       // Lấy lại document từ DB để có thể populate
       review = await this.reviewModel.findById(review._id);
     }
+
+    // Cập nhật rating và numReviews trong product
+    await this.updateProductRating(reviewDto.product);
+
     // Populate
     if (review && typeof review.populate === 'function') {
       await review.populate('product');
@@ -111,6 +115,9 @@ export class ReviewsService {
       // Lấy lại document từ DB để có thể populate
       review = await this.reviewModel.findById(created._id);
     }
+    // Cập nhật rating và numReviews trong product
+    await this.updateProductRating(productId);
+    
     // Đảm bảo review là document, không phải Promise
     if (review && typeof review.populate === 'function') {
       await review.populate('product');
@@ -159,6 +166,10 @@ export class ReviewsService {
     if (updateDto.comment !== undefined) comment.comment = updateDto.comment;
     if (updateDto.imgs !== undefined) comment.imgs = updateDto.imgs;
     await review.save();
+    
+    // Cập nhật rating và numReviews trong product
+    await this.updateProductRating(review.product.toString());
+    
     return comment;
   }
 
@@ -171,6 +182,10 @@ export class ReviewsService {
     const deleted = review.comments[idx];
     review.comments.splice(idx, 1);
     await review.save();
+    
+    // Cập nhật rating và numReviews trong product
+    await this.updateProductRating(review.product.toString());
+    
     return deleted;
   }
 
@@ -199,6 +214,10 @@ export class ReviewsService {
     }
     
     await review.save();
+    
+    // Cập nhật rating và numReviews trong product
+    await this.updateProductRating(productId);
+    
     return this.reviewModel.findById(review._id)
       .populate('product')
       .populate('comments.user')
@@ -207,6 +226,187 @@ export class ReviewsService {
 
   async deleteByProductId(productId: string): Promise<boolean> {
     const result = await this.reviewModel.deleteOne({ product: new Types.ObjectId(productId) });
+    
+    // Cập nhật rating và numReviews trong product về 0 khi xóa tất cả reviews
+    if (result.deletedCount > 0) {
+      await this.productModel.findByIdAndUpdate(productId, {
+        rating: 0,
+        numReviews: 0
+      });
+    }
+    
     return result.deletedCount > 0;
+  }
+
+  /**
+   * Cập nhật rating và numReviews cho product dựa trên tất cả reviews
+   */
+  private async updateProductRating(productId: string): Promise<void> {
+    // Lấy tất cả reviews của product
+    const review = await this.reviewModel.findOne({ product: new Types.ObjectId(productId) });
+    
+    if (!review || review.comments.length === 0) {
+      // Nếu không có review, set rating = 0 và numReviews = 0
+      await this.productModel.findByIdAndUpdate(productId, {
+        rating: 0,
+        numReviews: 0
+      });
+      return;
+    }
+
+    // Tính tổng rating và số lượng reviews
+    const totalRating = review.comments.reduce((acc, comment) => acc + comment.rating, 0);
+    const averageRating = totalRating / review.comments.length;
+    const numReviews = review.comments.length;
+
+    // Cập nhật product
+    await this.productModel.findByIdAndUpdate(productId, {
+      rating: Math.round(averageRating * 10) / 10, // Làm tròn đến 1 chữ số thập phân
+      numReviews: numReviews
+    });
+  }
+
+  /**
+   * Duyệt tất cả reviews và cập nhật rating, numReviews cho tất cả products
+   */
+  async syncAllProductRatings(): Promise<{ 
+    totalProducts: number; 
+    updatedProducts: number; 
+    productsWithReviews: number;
+    productsWithoutReviews: number;
+    details: Array<{ productId: string; productName: string; oldRating: number; newRating: number; oldNumReviews: number; newNumReviews: number; }>
+  }> {
+    const result = {
+      totalProducts: 0,
+      updatedProducts: 0,
+      productsWithReviews: 0,
+      productsWithoutReviews: 0,
+      details: []
+    };
+
+    // Lấy tất cả products
+    const allProducts = await this.productModel.find({});
+    result.totalProducts = allProducts.length;
+
+    for (const product of allProducts) {
+      const productId = product._id.toString();
+      const oldRating = product.rating;
+      const oldNumReviews = product.numReviews;
+
+      // Lấy review của product này
+      const review = await this.reviewModel.findOne({ product: product._id });
+      
+      if (!review || review.comments.length === 0) {
+        // Product không có review
+        if (oldRating !== 0 || oldNumReviews !== 0) {
+          await this.productModel.findByIdAndUpdate(productId, {
+            rating: 0,
+            numReviews: 0
+          });
+          result.updatedProducts++;
+        }
+        result.productsWithoutReviews++;
+        
+        result.details.push({
+          productId,
+          productName: product.name,
+          oldRating,
+          newRating: 0,
+          oldNumReviews,
+          newNumReviews: 0
+        });
+      } else {
+        // Product có review
+        const totalRating = review.comments.reduce((acc, comment) => acc + comment.rating, 0);
+        const averageRating = totalRating / review.comments.length;
+        const newRating = Math.round(averageRating * 10) / 10;
+        const newNumReviews = review.comments.length;
+
+        // Chỉ cập nhật nếu có thay đổi
+        if (oldRating !== newRating || oldNumReviews !== newNumReviews) {
+          await this.productModel.findByIdAndUpdate(productId, {
+            rating: newRating,
+            numReviews: newNumReviews
+          });
+          result.updatedProducts++;
+        }
+        
+        result.productsWithReviews++;
+        
+        result.details.push({
+          productId,
+          productName: product.name,
+          oldRating,
+          newRating,
+          oldNumReviews,
+          newNumReviews
+        });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Cập nhật rating cho một product cụ thể
+   */
+  async syncProductRating(productId: string): Promise<{
+    productId: string;
+    productName: string;
+    oldRating: number;
+    newRating: number;
+    oldNumReviews: number;
+    newNumReviews: number;
+    hasReviews: boolean;
+  }> {
+    const product = await this.productModel.findById(productId);
+    if (!product) {
+      throw new NotFoundException('Product không tồn tại');
+    }
+
+    const oldRating = product.rating;
+    const oldNumReviews = product.numReviews;
+
+    // Lấy review của product
+    const review = await this.reviewModel.findOne({ product: product._id });
+    
+    if (!review || review.comments.length === 0) {
+      // Product không có review
+      await this.productModel.findByIdAndUpdate(productId, {
+        rating: 0,
+        numReviews: 0
+      });
+      
+      return {
+        productId,
+        productName: product.name,
+        oldRating,
+        newRating: 0,
+        oldNumReviews,
+        newNumReviews: 0,
+        hasReviews: false
+      };
+    } else {
+      // Product có review
+      const totalRating = review.comments.reduce((acc, comment) => acc + comment.rating, 0);
+      const averageRating = totalRating / review.comments.length;
+      const newRating = Math.round(averageRating * 10) / 10;
+      const newNumReviews = review.comments.length;
+
+      await this.productModel.findByIdAndUpdate(productId, {
+        rating: newRating,
+        numReviews: newNumReviews
+      });
+      
+      return {
+        productId,
+        productName: product.name,
+        oldRating,
+        newRating,
+        oldNumReviews,
+        newNumReviews,
+        hasReviews: true
+      };
+    }
   }
 } 

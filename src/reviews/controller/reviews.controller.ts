@@ -1,7 +1,9 @@
 import { Controller, Get, Post, Body, Param, Put, Delete, Query, NotFoundException } from '@nestjs/common';
 import { ReviewsService } from '../services/reviews.service';
 import { ReviewDto, CommentDto } from '../dtos/review.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { AdminGuard } from '@/guards/admin.guard';
+import { UseGuards } from '@nestjs/common';
 
 @ApiTags('Reviews')
 @Controller('reviews')
@@ -90,6 +92,77 @@ export class ReviewsController {
   @ApiResponse({ status: 200, description: 'Xóa comment thành công'})
   async deleteCommentById(@Param('id') id: string) {
     return this.reviewsService.deleteCommentById(id);
+  }
+
+  @Post('sync-all-ratings')
+  @UseGuards(AdminGuard)
+  @ApiOperation({ 
+    summary: 'Đồng bộ rating và numReviews cho tất cả products',
+    description: 'Duyệt tất cả reviews và cập nhật rating, numReviews cho tất cả products. Chỉ admin mới có quyền sử dụng.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Đồng bộ thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        totalProducts: { type: 'number', example: 100 },
+        updatedProducts: { type: 'number', example: 25 },
+        productsWithReviews: { type: 'number', example: 80 },
+        productsWithoutReviews: { type: 'number', example: 20 },
+        details: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              productId: { type: 'string' },
+              productName: { type: 'string' },
+              oldRating: { type: 'number' },
+              newRating: { type: 'number' },
+              oldNumReviews: { type: 'number' },
+              newNumReviews: { type: 'number' }
+            }
+          }
+        }
+      }
+    }
+  })
+  async syncAllProductRatings() {
+    return this.reviewsService.syncAllProductRatings();
+  }
+
+  @Post('sync-product-rating/:productId')
+  @ApiOperation({ 
+    summary: 'Đồng bộ rating và numReviews cho một product cụ thể',
+    description: 'Cập nhật rating và numReviews cho một product dựa trên reviews hiện có.'
+  })
+  @ApiParam({ 
+    name: 'productId', 
+    description: 'ID của product cần đồng bộ',
+    example: '60d21b4967d0d8992e610c90'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Đồng bộ thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        productId: { type: 'string' },
+        productName: { type: 'string' },
+        oldRating: { type: 'number' },
+        newRating: { type: 'number' },
+        oldNumReviews: { type: 'number' },
+        newNumReviews: { type: 'number' },
+        hasReviews: { type: 'boolean' }
+      }
+    }
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'Product không tồn tại' 
+  })
+  async syncProductRating(@Param('productId') productId: string) {
+    return this.reviewsService.syncProductRating(productId);
   }
 
 } 
