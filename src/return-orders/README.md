@@ -15,6 +15,7 @@ Tạo yêu cầu trả hàng cho đơn hàng đã giao thành công. Mỗi item 
 {
   "reason": "Sản phẩm không đúng mô tả",
   "description": "Màu sắc khác với hình ảnh",
+  "returnType": "refund",
   "items": [
     {
       "productId": "507f1f77bcf86cd799439013",
@@ -22,7 +23,8 @@ Tạo yêu cầu trả hàng cho đơn hàng đã giao thành công. Mỗi item 
       "quantity": 1
     }
   ],
-  "images": ["image1.jpg", "image2.jpg"]
+  "images": ["image1.jpg", "image2.jpg"],
+  "videoUrl": "https://example.com/video.mp4"
 }
 ```
 
@@ -35,7 +37,9 @@ Tạo yêu cầu trả hàng cho đơn hàng đã giao thành công. Mỗi item 
 
 ### Các trường tùy chọn:
 - `description`: Mô tả chi tiết
+- `returnType`: Loại yêu cầu trả hàng (`refund` hoặc `exchange`), mặc định là `exchange`
 - `images`: Mảng URL hình ảnh đính kèm
+- `videoUrl`: URL video đính kèm
 
 ### Ví dụ cURL
 ```bash
@@ -73,6 +77,8 @@ curl -X POST "http://localhost:3001/v1/return-orders/orders/688eac0252e39a386f66
     }
   ],
   "totalRefundAmount": 399000,
+  "returnType": "refund",
+  "videoUrl": "https://example.com/video.mp4",
   "status": "pending",
   "createdAt": "2025-01-15T10:30:00.000Z"
 }
@@ -120,4 +126,32 @@ Tương ứng với:
 - Item status: `return-pending` → `return-rejected`
 
 ### 4. Khôi phục stock
-Khi status = `completed`, hệ thống sẽ tự động khôi phục stock của sản phẩm. 
+Khi status = `completed`, hệ thống sẽ tự động khôi phục stock của sản phẩm.
+
+### 5. Phân loại yêu cầu trả hàng
+Hệ thống hỗ trợ 2 loại yêu cầu trả hàng:
+
+- **`refund`** (mặc định): Hoàn tiền cho khách hàng
+- **`exchange`**: Đổi hàng lấy sản phẩm khác
+
+**Ví dụ yêu cầu đổi hàng:**
+```json
+{
+  "reason": "Sản phẩm không vừa size",
+  "description": "Cần đổi size từ M sang L",
+  "returnType": "exchange",
+  "items": [
+    {
+      "productId": "507f1f77bcf86cd799439013",
+      "itemId": "507f1f77bcf86cd799439014",
+      "quantity": 1
+    }
+  ],
+  "images": ["size_comparison.jpg"],
+  "videoUrl": "https://example.com/size_demo.mp4"
+}
+```
+
+**Lưu ý:** 
+- Trường `returnType` là tùy chọn, nếu không truyền vào sẽ mặc định là `exchange`
+- Trường `videoUrl` là tùy chọn, hỗ trợ đính kèm video để minh họa vấn đề 

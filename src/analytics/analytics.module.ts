@@ -5,6 +5,7 @@ import { Product, ProductSchema } from '../products/schemas/product.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Voucher, VoucherSchema } from '../vouchers/schemas/voucher.schema';
 import { Category, CategorySchema } from '@/category/schemas/category.schema';
+import { ReturnOrder, ReturnOrderSchema } from '@/return-orders/schemas/return-order.schema';
 import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
 
@@ -16,6 +17,7 @@ import { AnalyticsService } from './analytics.service';
       { name: User.name, schema: UserSchema },
       { name: Category.name, schema: CategorySchema },
       { name: Voucher.name, schema: VoucherSchema },
+      { name: ReturnOrder.name, schema: ReturnOrderSchema },
     ]),
   ],
   controllers: [AnalyticsController],

@@ -218,4 +218,34 @@ export class ReturnOrderAnalyticsController {
     const dateRange = startDate || endDate ? { startDate, endDate } : undefined;
     return this.returnOrderAnalyticsService.getReturnByTime(dateRange, timeType);
   }
+
+  @Get('return-type-analysis')
+  @ApiOperation({
+    summary: '6. Phân tích theo loại trả hàng',
+    description: 'Thống kê phân tích yêu cầu trả hàng theo loại (refund/exchange)',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Ngày bắt đầu lọc (YYYY-MM-DD)',
+    example: '2024-01-01',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Ngày kết thúc lọc (YYYY-MM-DD)',
+    example: '2024-12-31',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy phân tích theo loại trả hàng thành công',
+  })
+  @ApiResponse({ status: 403, description: 'Chỉ admin mới có quyền truy cập' })
+  async getReturnTypeAnalysis(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const dateRange = startDate || endDate ? { startDate, endDate } : undefined;
+    return this.returnOrderAnalyticsService.getReturnTypeAnalysis(dateRange);
+  }
 }

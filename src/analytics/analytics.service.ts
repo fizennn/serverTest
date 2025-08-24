@@ -20,6 +20,7 @@ import { Product } from '@/products/schemas/product.schema';
 import { User } from '@/users/schemas/user.schema';
 import { Category } from '@/category/schemas/category.schema';
 import { Voucher } from '@/vouchers/schemas/voucher.schema';
+import { ReturnOrder } from '@/return-orders/schemas/return-order.schema';
 
 @Injectable()
 export class AnalyticsService {
@@ -29,6 +30,7 @@ export class AnalyticsService {
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Category.name) private categoryModel: Model<Category>,
     @InjectModel(Voucher.name) private voucherModel: Model<Voucher>,
+    @InjectModel(ReturnOrder.name) private returnOrderModel: Model<ReturnOrder>,
   ) {}
 
   async getOrderOverview(
@@ -38,13 +40,51 @@ export class AnalyticsService {
 
     const [overviewStats] = await this.orderModel.aggregate([
       { $match: matchCondition },
+      // Lookup với return orders để lấy thông tin hoàn trả
+      {
+        $lookup: {
+          from: 'returnorders',
+          localField: '_id',
+          foreignField: 'orderId',
+          as: 'returnOrders'
+        }
+      },
+      // Tính toán doanh thu với logic trừ đơn hoàn tiền
+      {
+        $addFields: {
+          refundAmount: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$returnOrders',
+                    as: 'return',
+                    cond: {
+                      $and: [
+                        { $eq: ['$$return.returnType', 'refund'] },
+                        { $eq: ['$$return.status', 'completed'] }
+                      ]
+                    }
+                  }
+                },
+                as: 'refund',
+                in: '$$refund.totalRefundAmount'
+              }
+            }
+          }
+        }
+      },
       {
         $group: {
           _id: null,
           totalOrders: { $sum: 1 },
           successfulOrders: {
             $sum: {
-              $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0],
+              $cond: [
+                { $in: ['$status', ['delivered', 'return']] }, 
+                1, 
+                0
+              ],
             },
           },
           cancelledOrders: {
@@ -55,7 +95,7 @@ export class AnalyticsService {
           totalProductsSold: {
             $sum: {
               $cond: [
-                { $eq: ['$status', 'delivered'] },
+                { $in: ['$status', ['delivered', 'return']] },
                 { $sum: '$items.quantity' },
                 0,
               ],
@@ -63,7 +103,11 @@ export class AnalyticsService {
           },
           totalRevenue: {
             $sum: {
-              $cond: [{ $eq: ['$status', 'delivered'] }, '$total', 0],
+              $cond: [
+                { $in: ['$status', ['delivered', 'return']] },
+                { $subtract: ['$total', { $ifNull: ['$refundAmount', 0] }] },
+                0
+              ],
             },
           },
         },
@@ -168,17 +212,58 @@ export class AnalyticsService {
   ): Promise<TopProductDto[]> {
     const matchCondition = {
       ...this.buildDateFilter(dateRange),
-      status: 'delivered',
+      status: { $in: ['delivered', 'return'] }
     };
 
     return await this.orderModel.aggregate([
       { $match: matchCondition },
+      // Lookup với return orders để lấy thông tin hoàn trả
+      {
+        $lookup: {
+          from: 'returnorders',
+          localField: '_id',
+          foreignField: 'orderId',
+          as: 'returnOrders'
+        }
+      },
+      // Tính toán doanh thu với logic trừ đơn hoàn tiền
+      {
+        $addFields: {
+          refundAmount: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$returnOrders',
+                    as: 'return',
+                    cond: {
+                      $and: [
+                        { $eq: ['$$return.returnType', 'refund'] },
+                        { $eq: ['$$return.status', 'completed'] }
+                      ]
+                    }
+                  }
+                },
+                as: 'refund',
+                in: '$$refund.totalRefundAmount'
+              }
+            }
+          }
+        }
+      },
       { $unwind: '$items' },
       {
         $group: {
           _id: '$items.product',
           soldQuantity: { $sum: '$items.quantity' },
-          revenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } },
+          revenue: { 
+            $sum: { 
+              $subtract: [
+                { $multiply: ['$items.quantity', '$items.price'] },
+                { $ifNull: ['$refundAmount', 0] }
+              ]
+            } 
+          },
         },
       },
       { $sort: { revenue: -1 } },
@@ -219,11 +304,45 @@ export class AnalyticsService {
   ): Promise<RevenueByCategoryDto[]> {
     const matchCondition = {
       ...this.buildDateFilter(dateRange),
-      status: 'delivered',
+      status: { $in: ['delivered', 'return'] }
     };
 
     const categoryRevenue = await this.orderModel.aggregate([
       { $match: matchCondition },
+      // Lookup với return orders để lấy thông tin hoàn trả
+      {
+        $lookup: {
+          from: 'returnorders',
+          localField: '_id',
+          foreignField: 'orderId',
+          as: 'returnOrders'
+        }
+      },
+      // Tính toán doanh thu với logic trừ đơn hoàn tiền
+      {
+        $addFields: {
+          refundAmount: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$returnOrders',
+                    as: 'return',
+                    cond: {
+                      $and: [
+                        { $eq: ['$$return.returnType', 'refund'] },
+                        { $eq: ['$$return.status', 'completed'] }
+                      ]
+                    }
+                  }
+                },
+                as: 'refund',
+                in: '$$refund.totalRefundAmount'
+              }
+            }
+          }
+        }
+      },
       { $unwind: '$items' },
       {
         $lookup: {
@@ -247,7 +366,14 @@ export class AnalyticsService {
         $group: {
           _id: '$category._id',
           categoryName: { $first: '$category.name' },
-          revenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } },
+          revenue: { 
+            $sum: { 
+              $subtract: [
+                { $multiply: ['$items.quantity', '$items.price'] },
+                { $ifNull: ['$refundAmount', 0] }
+              ]
+            } 
+          },
           productsSold: { $sum: '$items.quantity' },
         },
       },
@@ -344,16 +470,54 @@ export class AnalyticsService {
   ): Promise<TopCustomerDto[]> {
     const matchCondition = {
       ...this.buildDateFilter(dateRange),
-      status: 'delivered',
+      status: { $in: ['delivered', 'return'] }
     };
 
     return await this.orderModel.aggregate([
       { $match: matchCondition },
+      // Lookup với return orders để lấy thông tin hoàn trả
+      {
+        $lookup: {
+          from: 'returnorders',
+          localField: '_id',
+          foreignField: 'orderId',
+          as: 'returnOrders'
+        }
+      },
+      // Tính toán doanh thu với logic trừ đơn hoàn tiền
+      {
+        $addFields: {
+          refundAmount: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$returnOrders',
+                    as: 'return',
+                    cond: {
+                      $and: [
+                        { $eq: ['$$return.returnType', 'refund'] },
+                        { $eq: ['$$return.status', 'completed'] }
+                      ]
+                    }
+                  }
+                },
+                as: 'refund',
+                in: '$$refund.totalRefundAmount'
+              }
+            }
+          }
+        }
+      },
       {
         $group: {
           _id: '$idUser',
           orderCount: { $sum: 1 },
-          totalSpent: { $sum: '$total' },
+          totalSpent: { 
+            $sum: { 
+              $subtract: ['$total', { $ifNull: ['$refundAmount', 0] }]
+            } 
+          },
         },
       },
       {
@@ -390,16 +554,54 @@ export class AnalyticsService {
   ): Promise<PaymentMethodStatsDto[]> {
     const matchCondition = {
       ...this.buildDateFilter(dateRange),
-      status: 'delivered',
+      status: { $in: ['delivered', 'return'] }
     };
 
     const stats = await this.orderModel.aggregate([
       { $match: matchCondition },
+      // Lookup với return orders để lấy thông tin hoàn trả
+      {
+        $lookup: {
+          from: 'returnorders',
+          localField: '_id',
+          foreignField: 'orderId',
+          as: 'returnOrders'
+        }
+      },
+      // Tính toán doanh thu với logic trừ đơn hoàn tiền
+      {
+        $addFields: {
+          refundAmount: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$returnOrders',
+                    as: 'return',
+                    cond: {
+                      $and: [
+                        { $eq: ['$$return.returnType', 'refund'] },
+                        { $eq: ['$$return.status', 'completed'] }
+                      ]
+                    }
+                  }
+                },
+                as: 'refund',
+                in: '$$refund.totalRefundAmount'
+              }
+            }
+          }
+        }
+      },
       {
         $group: {
           _id: '$payment',
           orderCount: { $sum: 1 },
-          revenue: { $sum: '$total' },
+          revenue: { 
+            $sum: { 
+              $subtract: ['$total', { $ifNull: ['$refundAmount', 0] }]
+            } 
+          },
         },
       },
       { $sort: { orderCount: -1 } },
@@ -423,12 +625,46 @@ export class AnalyticsService {
   ): Promise<VoucherUsageDto[]> {
     const matchCondition = {
       ...this.buildDateFilter(dateRange),
-      status: 'delivered',
+      status: { $in: ['delivered', 'return'] },
       'vouchers.0': { $exists: true },
     };
 
     return await this.orderModel.aggregate([
       { $match: matchCondition },
+      // Lookup với return orders để lấy thông tin hoàn trả
+      {
+        $lookup: {
+          from: 'returnorders',
+          localField: '_id',
+          foreignField: 'orderId',
+          as: 'returnOrders'
+        }
+      },
+      // Tính toán doanh thu với logic trừ đơn hoàn tiền
+      {
+        $addFields: {
+          refundAmount: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$returnOrders',
+                    as: 'return',
+                    cond: {
+                      $and: [
+                        { $eq: ['$$return.returnType', 'refund'] },
+                        { $eq: ['$$return.status', 'completed'] }
+                      ]
+                    }
+                  }
+                },
+                as: 'refund',
+                in: '$$refund.totalRefundAmount'
+              }
+            }
+          }
+        }
+      },
       { $unwind: '$vouchers' },
       {
         $group: {
@@ -437,7 +673,11 @@ export class AnalyticsService {
           discount: { $first: '$vouchers.disCount' },
           usageCount: { $sum: 1 },
           totalDiscountAmount: { $sum: '$vouchers.appliedDiscount' },
-          revenueFromVoucherOrders: { $sum: '$total' },
+          revenueFromVoucherOrders: { 
+            $sum: { 
+              $subtract: ['$total', { $ifNull: ['$refundAmount', 0] }]
+            } 
+          },
         },
       },
       { $sort: { usageCount: -1 } },
@@ -531,13 +771,51 @@ export class AnalyticsService {
       {
         $match: {
           createdAt: { $gte: startOfDay, $lte: endOfDay },
-          status: 'delivered',
+          status: { $in: ['delivered', 'return'] }
         },
+      },
+      // Lookup với return orders để lấy thông tin hoàn trả
+      {
+        $lookup: {
+          from: 'returnorders',
+          localField: '_id',
+          foreignField: 'orderId',
+          as: 'returnOrders'
+        }
+      },
+      // Tính toán doanh thu với logic trừ đơn hoàn tiền
+      {
+        $addFields: {
+          refundAmount: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$returnOrders',
+                    as: 'return',
+                    cond: {
+                      $and: [
+                        { $eq: ['$$return.returnType', 'refund'] },
+                        { $eq: ['$$return.status', 'completed'] }
+                      ]
+                    }
+                  }
+                },
+                as: 'refund',
+                in: '$$refund.totalRefundAmount'
+              }
+            }
+          }
+        }
       },
       {
         $group: {
           _id: '$payment',
-          revenue: { $sum: '$total' },
+          revenue: { 
+            $sum: { 
+              $subtract: ['$total', { $ifNull: ['$refundAmount', 0] }]
+            } 
+          },
         },
       },
     ]);
@@ -571,13 +849,51 @@ export class AnalyticsService {
       {
         $match: {
           createdAt: { $gte: startDate, $lte: endDate },
-          status: 'delivered',
+          status: { $in: ['delivered', 'return'] }
         },
+      },
+      // Lookup với return orders để lấy thông tin hoàn trả
+      {
+        $lookup: {
+          from: 'returnorders',
+          localField: '_id',
+          foreignField: 'orderId',
+          as: 'returnOrders'
+        }
+      },
+      // Tính toán doanh thu với logic trừ đơn hoàn tiền
+      {
+        $addFields: {
+          refundAmount: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$returnOrders',
+                    as: 'return',
+                    cond: {
+                      $and: [
+                        { $eq: ['$$return.returnType', 'refund'] },
+                        { $eq: ['$$return.status', 'completed'] }
+                      ]
+                    }
+                  }
+                },
+                as: 'refund',
+                in: '$$refund.totalRefundAmount'
+              }
+            }
+          }
+        }
       },
       {
         $group: {
           _id: '$payment',
-          revenue: { $sum: '$total' },
+          revenue: { 
+            $sum: { 
+              $subtract: ['$total', { $ifNull: ['$refundAmount', 0] }]
+            } 
+          },
         },
       },
     ]);
@@ -658,13 +974,51 @@ export class AnalyticsService {
             $gte: new Date(year, 0, 1),
             $lte: new Date(year, 11, 31, 23, 59, 59, 999),
           },
-          status: 'delivered',
+          status: { $in: ['delivered', 'return'] }
         },
+      },
+      // Lookup với return orders để lấy thông tin hoàn trả
+      {
+        $lookup: {
+          from: 'returnorders',
+          localField: '_id',
+          foreignField: 'orderId',
+          as: 'returnOrders'
+        }
+      },
+      // Tính toán doanh thu với logic trừ đơn hoàn tiền
+      {
+        $addFields: {
+          refundAmount: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$returnOrders',
+                    as: 'return',
+                    cond: {
+                      $and: [
+                        { $eq: ['$$return.returnType', 'refund'] },
+                        { $eq: ['$$return.status', 'completed'] }
+                      ]
+                    }
+                  }
+                },
+                as: 'refund',
+                in: '$$refund.totalRefundAmount'
+              }
+            }
+          }
+        }
       },
       {
         $group: {
           _id: { $month: '$createdAt' },
-          revenue: { $sum: '$total' },
+          revenue: { 
+            $sum: { 
+              $subtract: ['$total', { $ifNull: ['$refundAmount', 0] }]
+            } 
+          },
         },
       },
       { $sort: { _id: 1 } },
@@ -691,7 +1045,7 @@ export class AnalyticsService {
   ): Promise<RevenueByTimeDto[]> {
     const matchCondition = {
       ...this.buildDateFilter(dateRange),
-      status: 'delivered',
+      status: { $in: ['delivered', 'return'] }
     };
 
     let groupBy: any;
@@ -729,10 +1083,48 @@ export class AnalyticsService {
 
     const revenueStats = await this.orderModel.aggregate([
       { $match: matchCondition },
+      // Lookup với return orders để lấy thông tin hoàn trả
+      {
+        $lookup: {
+          from: 'returnorders',
+          localField: '_id',
+          foreignField: 'orderId',
+          as: 'returnOrders'
+        }
+      },
+      // Tính toán doanh thu với logic trừ đơn hoàn tiền
+      {
+        $addFields: {
+          refundAmount: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$returnOrders',
+                    as: 'return',
+                    cond: {
+                      $and: [
+                        { $eq: ['$$return.returnType', 'refund'] },
+                        { $eq: ['$$return.status', 'completed'] }
+                      ]
+                    }
+                  }
+                },
+                as: 'refund',
+                in: '$$refund.totalRefundAmount'
+              }
+            }
+          }
+        }
+      },
       {
         $group: {
           _id: groupBy,
-          revenue: { $sum: '$total' },
+          revenue: { 
+            $sum: { 
+              $subtract: ['$total', { $ifNull: ['$refundAmount', 0] }]
+            } 
+          },
           orderCount: { $sum: 1 },
         },
       },
@@ -764,5 +1156,109 @@ export class AnalyticsService {
     ]);
 
     return revenueStats;
+  }
+
+  private async getRefundOrderIds(dateRange?: DateRangeQueryDto): Promise<string[]> {
+    const matchCondition = this.buildDateFilter(dateRange);
+    
+    // Lấy danh sách order IDs có return type = 'refund' (hoàn tiền) và đã hoàn thành
+    // Lọc theo thời gian hoàn thành đơn hoàn trả (processedAt hoặc updatedAt)
+    const refundOrders = await this.returnOrderModel.aggregate([
+      { 
+        $match: { 
+          returnType: 'refund', 
+          status: 'completed',
+          ...matchCondition
+        } 
+      },
+      {
+        $group: {
+          _id: '$orderId'
+        }
+      }
+    ]);
+    
+    return refundOrders.map(order => order._id.toString());
+  }
+
+  private async getRefundOrderIdsForDate(date: Date): Promise<string[]> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Lấy danh sách order IDs có return type = 'refund' (hoàn tiền) và đã hoàn thành trong ngày
+    // Lọc theo thời gian hoàn thành đơn hoàn trả
+    const refundOrders = await this.returnOrderModel.aggregate([
+      { 
+        $match: { 
+          returnType: 'refund', 
+          status: 'completed',
+          $or: [
+            { processedAt: { $gte: startOfDay, $lte: endOfDay } },
+            { updatedAt: { $gte: startOfDay, $lte: endOfDay } }
+          ]
+        } 
+      },
+      {
+        $group: {
+          _id: '$orderId'
+        }
+      }
+    ]);
+    
+    return refundOrders.map(order => order._id.toString());
+  }
+
+  private async getRefundOrderIdsForMonth(startDate: Date, endDate: Date): Promise<string[]> {
+    // Lấy danh sách order IDs có return type = 'refund' (hoàn tiền) và đã hoàn thành trong tháng
+    // Lọc theo thời gian hoàn thành đơn hoàn trả
+    const refundOrders = await this.returnOrderModel.aggregate([
+      { 
+        $match: { 
+          returnType: 'refund', 
+          status: 'completed',
+          $or: [
+            { processedAt: { $gte: startDate, $lte: endDate } },
+            { updatedAt: { $gte: startDate, $lte: endDate } }
+          ]
+        } 
+      },
+      {
+        $group: {
+          _id: '$orderId'
+        }
+      }
+    ]);
+    
+    return refundOrders.map(order => order._id.toString());
+  }
+
+  private async getRefundOrderIdsForYear(year: number): Promise<string[]> {
+    const startOfYear = new Date(year, 0, 1);
+    const endOfYear = new Date(year, 11, 31, 23, 59, 59, 999);
+    
+    // Lấy danh sách order IDs có return type = 'refund' (hoàn tiền) và đã hoàn thành trong năm
+    // Lọc theo thời gian hoàn thành đơn hoàn trả
+    const refundOrders = await this.returnOrderModel.aggregate([
+      { 
+        $match: { 
+          returnType: 'refund', 
+          status: 'completed',
+          $or: [
+            { processedAt: { $gte: startOfYear, $lte: endOfYear } },
+            { updatedAt: { $gte: startOfYear, $lte: endOfYear } }
+          ]
+        } 
+      },
+      {
+        $group: {
+          _id: '$orderId'
+        }
+      }
+    ]);
+    
+    return refundOrders.map(order => order._id.toString());
   }
 }

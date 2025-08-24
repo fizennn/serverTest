@@ -15,6 +15,14 @@
 **Ý nghĩa:**  
 Cho biết tổng số đơn hàng, số đơn thành công, số đơn bị hủy, tổng sản phẩm đã bán, tổng doanh thu, tỷ lệ thành công.
 
+**Lưu ý về logic tính toán:**
+- Đơn hàng thành công bao gồm: đơn có trạng thái `delivered` hoặc `return`
+- Doanh thu được tính từ tất cả đơn hàng thành công, sau đó trừ đi số tiền hoàn trả từ các đơn hoàn tiền đã hoàn thành
+- Đơn hoàn trả loại "đổi hàng" không bị trừ khỏi doanh thu
+- Chỉ đơn hoàn trả loại "hoàn tiền" và đã hoàn thành mới bị trừ khỏi doanh thu
+- **Thời gian trừ đơn hoàn tiền:** Dựa trên thời gian hoàn thành đơn hoàn trả (`processedAt` hoặc `updatedAt`), không phải thời gian tạo đơn hàng gốc
+- **Số tiền trừ:** Chỉ trừ `totalRefundAmount` từ đơn hoàn tiền, không trừ toàn bộ đơn hàng
+
 **Tham số (truyền trên URL, có thể bỏ qua):**
 - `startDate`: Ngày bắt đầu lọc (dạng YYYY-MM-DD), ví dụ: `2024-01-01`
 - `endDate`: Ngày kết thúc lọc (dạng YYYY-MM-DD), ví dụ: `2024-12-31`
@@ -229,5 +237,22 @@ Thống kê lượt sử dụng, tổng tiền đã giảm, doanh thu từ các 
 - **Muốn biết gì về bán hàng, doanh thu, sản phẩm, khách hàng, voucher... đều có API riêng.**
 - **Chỉ cần gọi đúng đường dẫn, thêm tham số nếu muốn lọc, sẽ nhận được dữ liệu chi tiết.**
 - **Tất cả API đều trả về dữ liệu dạng bảng hoặc danh sách, rất dễ đọc và xử lý.**
+
+## **Logic tính toán doanh thu mới (Cập nhật)**
+
+**Cách tính doanh thu thực tế:**
+1. **Lấy tất cả đơn hàng thành công:** Bao gồm đơn có trạng thái `delivered` hoặc `return`
+2. **Trừ đi số tiền hoàn trả:** Chỉ trừ `totalRefundAmount` từ các đơn hoàn trả có `returnType: 'refund'` và `status: 'completed'`
+3. **Không trừ đơn đổi hàng:** Đơn hoàn trả có `returnType: 'exchange'` không bị trừ khỏi doanh thu
+4. **Thời gian trừ đơn hoàn tiền:** Dựa trên thời gian hoàn thành đơn hoàn trả, không phải thời gian tạo đơn hàng gốc
+
+**Ví dụ:**
+- Đơn hàng A: 1,000,000 VNĐ (delivered, tạo ngày 01/01) → Tính vào doanh thu tháng 1
+- Đơn hàng B: 500,000 VNĐ (return, tạo ngày 15/01) → Tính vào doanh thu tháng 1  
+- Đơn hoàn tiền C: 300,000 VNĐ (refund, hoàn thành ngày 20/02) → Trừ 300,000 VNĐ khỏi doanh thu tháng 2
+- Đơn đổi hàng D: 200,000 VNĐ (exchange, hoàn thành ngày 25/02) → Không trừ
+
+**Doanh thu tháng 1 = 1,000,000 + 500,000 = 1,500,000 VNĐ**
+**Doanh thu tháng 2 = 0 - 300,000 = -300,000 VNĐ**
 
 Nếu bạn cần ví dụ cụ thể hơn về cách gọi bằng code, hoặc muốn giải thích thêm về ý nghĩa từng trường dữ liệu, hãy hỏi nhé! 

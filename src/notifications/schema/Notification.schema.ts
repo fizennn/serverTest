@@ -36,6 +36,7 @@ export class Notification {
       'order_updated',
       'order_delivered',
       'payment_status_updated',
+      'refund',
       'system',
     ],
     default: 'info',

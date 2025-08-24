@@ -41,6 +41,12 @@ export class ReturnOrder {
   })
   status: string;
 
+  @Prop({ 
+    enum: ['refund', 'exchange'],
+    default: 'exchange'
+  })
+  returnType: string;
+
   @Prop()
   adminNote?: string;
 
@@ -49,6 +55,9 @@ export class ReturnOrder {
 
   @Prop({ type: [String] })
   images?: string[];
+
+  @Prop()
+  videoUrl?: string;
 }
 
 export type ReturnOrderDocument = ReturnOrder & Document;

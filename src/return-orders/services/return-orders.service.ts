@@ -18,6 +18,7 @@ import { Order, OrderWithTimestamps } from '@/orders/schemas/order.schema';
 import { Product } from '@/products/schemas/product.schema';
 import { User } from '@/users/schemas/user.schema';
 import { NotificationService } from '@/notifications/notifications.service';
+import { VoucherRefundService } from '@/vouchers/services/voucher-refund.service';
 
 @Injectable()
 export class ReturnOrdersService {
@@ -27,6 +28,7 @@ export class ReturnOrdersService {
     @InjectModel(Product.name) private productModel: Model<Product>,
     @InjectModel(User.name) private userModel: Model<User>,
     private notificationService: NotificationService,
+    private voucherRefundService: VoucherRefundService,
   ) {}
 
   async createReturnRequest(
@@ -139,7 +141,9 @@ export class ReturnOrdersService {
       items: returnItems,
       totalRefundAmount,
       status: 'pending',
+      returnType: returnOrderDto.returnType || 'exchange',
       images: returnOrderDto.images || [],
+      videoUrl: returnOrderDto.videoUrl,
     });
 
     // Cập nhật trạng thái đơn hàng gốc thành return và lưu thay đổi
@@ -229,11 +233,13 @@ export class ReturnOrdersService {
     userId: string,
     page = 1,
     limit = 10,
+    returnType?: string,
   ): Promise<{ data: ReturnOrderDocument[]; total: number; pages: number }> {
     const skip = (page - 1) * limit;
 
     console.log('Searching for return orders with userId:', userId);
     console.log('userId type:', typeof userId);
+    console.log('returnType filter:', returnType);
 
     // Validate userId format
     if (!userId || typeof userId !== 'string') {
@@ -251,16 +257,26 @@ export class ReturnOrdersService {
 
     console.log('Converted userObjectId:', userObjectId);
 
+    // Tạo filter object
+    const filter: any = { customerId: userObjectId };
+    
+    // Thêm filter theo returnType nếu có
+    if (returnType) {
+      filter.returnType = returnType;
+    }
+
+    console.log('Filter for customer return requests:', filter);
+
     const [data, total] = await Promise.all([
       this.returnOrderModel
-        .find({ customerId: userObjectId })
+        .find(filter)
         .populate('orderId', 'total createdAt status')
         .populate('items.productId', 'name images')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .exec(),
-      this.returnOrderModel.countDocuments({ customerId: userObjectId }),
+      this.returnOrderModel.countDocuments(filter),
     ]);
 
     console.log('Found return orders:', data.length);
@@ -297,9 +313,22 @@ export class ReturnOrdersService {
     page = 1,
     limit = 10,
     status?: string,
+    returnType?: string,
   ): Promise<{ data: ReturnOrderDocument[]; total: number; pages: number }> {
     const skip = (page - 1) * limit;
-    const filter = status ? { status } : {};
+    const filter: any = {};
+
+    // Thêm filter theo status nếu có
+    if (status) {
+      filter.status = status;
+    }
+
+    // Thêm filter theo returnType nếu có
+    if (returnType) {
+      filter.returnType = returnType;
+    }
+
+    console.log('Filter for getAllReturnRequests:', filter);
 
     const [data, total] = await Promise.all([
       this.returnOrderModel
@@ -314,17 +343,24 @@ export class ReturnOrdersService {
       this.returnOrderModel.countDocuments(filter),
     ]);
 
+    console.log('Found return orders:', data.length);
+    console.log('Total count:', total);
+
     // Đảm bảo total và limit là số hợp lệ
     const validTotal = typeof total === 'number' ? total : 0;
     const validLimit = typeof limit === 'number' && limit > 0 ? limit : 10;
     
     const calculatedPages = validLimit > 0 ? Math.ceil(validTotal / validLimit) : 0;
     
-    return {
+    const result = {
       data,
       total: validTotal,
       pages: calculatedPages,
     };
+
+    console.log('Return result:', JSON.stringify(result, null, 2));
+
+    return result;
   }
 
   async debugAllReturns(): Promise<any> {
@@ -421,6 +457,43 @@ export class ReturnOrdersService {
       console.log('Đang xử lý trả hàng');
     } else if (updateData.status === 'completed') {
       await this.restoreProductStock(returnRequest);
+      
+      // Xử lý đặc biệt cho refund - tạo voucher hoàn tiền
+      if (returnRequest.returnType === 'refund') {
+        console.log('=== PHÁT HIỆN REFUND - BẮT ĐẦU TẠO VOUCHER ===');
+        console.log('Return type:', returnRequest.returnType);
+        console.log('Customer ID:', returnRequest.customerId.toString());
+        console.log('Refund amount:', returnRequest.totalRefundAmount);
+        console.log('Order ID:', returnRequest.orderId.toString());
+        console.log('Return order ID:', returnRequest._id.toString());
+        console.log('Reason:', returnRequest.reason);
+        
+        try {
+          console.log('🔄 Gọi VoucherRefundService.createRefundVoucher...');
+          const voucherResult = await this.voucherRefundService.createRefundVoucher({
+            userId: returnRequest.customerId.toString(),
+            refundAmount: returnRequest.totalRefundAmount,
+            orderId: returnRequest.orderId.toString(),
+            returnOrderId: returnRequest._id.toString(),
+            reason: returnRequest.reason,
+            voucherType: 'item',
+            validDays: 30,
+            description: `Voucher hoàn tiền từ yêu cầu trả hàng - ${returnRequest.reason}`,
+          });
+          
+          console.log('✅ Đã tạo voucher hoàn tiền thành công!');
+          console.log('📝 Message:', voucherResult.message);
+          console.log('💰 Giá trị voucher:', voucherResult.voucherValue);
+          console.log('🆔 Voucher ID:', voucherResult.voucher._id.toString());
+        } catch (voucherError) {
+          console.error('❌ Lỗi tạo voucher hoàn tiền:', voucherError);
+          console.error('❌ Error stack:', voucherError.stack);
+          // Không throw error để không ảnh hưởng đến quá trình hoàn thành
+        }
+      } else {
+        console.log('ℹ️ Không phải refund, bỏ qua tạo voucher. Return type:', returnRequest.returnType);
+      }
+      
       // Cập nhật trạng thái đơn hàng gốc thành return
       order.status = 'return';
       await (order as any).save();

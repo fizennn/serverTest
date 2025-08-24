@@ -17,6 +17,7 @@ import { Product } from '../../products/schemas/product.schema';
 import { Voucher } from '../../vouchers/schemas/voucher.schema';
 import { ProductsService } from '../../products/services/products.service';
 import { VouchersService } from '../../vouchers/services/vouchers.service';
+import { VoucherRefundService } from '../../vouchers/services/voucher-refund.service';
 import { UsersService } from '../../users/services/users.service';
 import { PayOSService } from '../../payOS/services/payOS.service';
 import { NotificationService } from '../../notifications/notifications.service';
@@ -33,6 +34,7 @@ export class OrdersService {
     @InjectModel(Voucher.name) private voucherModel: Model<Voucher>,
     private productsService: ProductsService,
     private vouchersService: VouchersService,
+    private voucherRefundService: VoucherRefundService,
     private usersService: UsersService,
     @Inject(forwardRef(() => PayOSService))
     private payOSService: PayOSService,
@@ -89,6 +91,43 @@ export class OrdersService {
         console.error('Lỗi khi hoàn trả tồn kho:', error);
         // Không throw error để không ảnh hưởng đến việc hủy đơn hàng
       }
+    }
+
+    // Xử lý hoàn tiền cho đơn hàng đã thanh toán
+    console.log('=== KIỂM TRA HOÀN TIỀN KHI HỦY ĐƠN HÀNG ===');
+    console.log('Payment status:', order.paymentStatus);
+    console.log('Payment method:', order.payment);
+    console.log('Order total:', order.total);
+    
+    if (order.paymentStatus === 'paid' && ['payOS', 'GOOGLE_PAY'].includes(order.payment)) {
+      console.log('🔄 Phát hiện đơn hàng đã thanh toán - bắt đầu tạo voucher hoàn tiền');
+      
+      try {
+        const voucherResult = await this.voucherRefundService.createRefundVoucher({
+          userId: order.idUser.toString(),
+          refundAmount: order.total,
+          orderId: order._id.toString(),
+          reason: 'Hủy đơn hàng đã thanh toán',
+          voucherType: 'item',
+          validDays: 30,
+          description: `Voucher hoàn tiền từ việc hủy đơn hàng - ${order._id}`,
+        });
+        
+        console.log('✅ Đã tạo voucher hoàn tiền thành công!');
+        console.log('💰 Giá trị voucher:', voucherResult.voucherValue);
+        console.log('🆔 Voucher ID:', voucherResult.voucher._id.toString());
+        
+        // Cập nhật payment status thành refunded
+        order.paymentStatus = 'refunded';
+        console.log('📝 Đã cập nhật payment status thành refunded');
+        
+      } catch (voucherError) {
+        console.error('❌ Lỗi tạo voucher hoàn tiền:', voucherError);
+        console.error('❌ Error stack:', voucherError.stack);
+        // Không throw error để không ảnh hưởng đến quá trình hủy đơn hàng
+      }
+    } else {
+      console.log('ℹ️ Không cần hoàn tiền - đơn hàng chưa thanh toán hoặc thanh toán COD');
     }
 
     order.status = 'cancelled';
@@ -1157,6 +1196,43 @@ export class OrdersService {
           // Không throw error để không ảnh hưởng đến việc hủy đơn hàng
         }
       }
+    }
+
+    // Xử lý hoàn tiền cho đơn hàng đã thanh toán (Admin hủy)
+    console.log('=== KIỂM TRA HOÀN TIỀN KHI ADMIN HỦY ĐƠN HÀNG ===');
+    console.log('Payment status:', order.paymentStatus);
+    console.log('Payment method:', order.payment);
+    console.log('Order total:', order.total);
+    
+    if (order.paymentStatus === 'paid' && ['payOS', 'GOOGLE_PAY'].includes(order.payment)) {
+      console.log('🔄 Phát hiện đơn hàng đã thanh toán - bắt đầu tạo voucher hoàn tiền (Admin hủy)');
+      
+      try {
+        const voucherResult = await this.voucherRefundService.createRefundVoucher({
+          userId: order.idUser.toString(),
+          refundAmount: order.total,
+          orderId: order._id.toString(),
+          reason: 'Admin hủy đơn hàng đã thanh toán',
+          voucherType: 'item',
+          validDays: 30,
+          description: `Voucher hoàn tiền từ việc admin hủy đơn hàng - ${order._id}`,
+        });
+        
+        console.log('✅ Đã tạo voucher hoàn tiền thành công! (Admin hủy)');
+        console.log('💰 Giá trị voucher:', voucherResult.voucherValue);
+        console.log('🆔 Voucher ID:', voucherResult.voucher._id.toString());
+        
+        // Cập nhật payment status thành refunded
+        order.paymentStatus = 'refunded';
+        console.log('📝 Đã cập nhật payment status thành refunded');
+        
+      } catch (voucherError) {
+        console.error('❌ Lỗi tạo voucher hoàn tiền (Admin hủy):', voucherError);
+        console.error('❌ Error stack:', voucherError.stack);
+        // Không throw error để không ảnh hưởng đến quá trình hủy đơn hàng
+      }
+    } else {
+      console.log('ℹ️ Không cần hoàn tiền - đơn hàng chưa thanh toán hoặc thanh toán COD');
     }
 
     // Cập nhật trạng thái đơn hàng thành cancelled

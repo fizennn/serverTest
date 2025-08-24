@@ -10,6 +10,7 @@ import { Product, ProductSchema } from '@/products/schemas/product.schema';
 import { User, UserSchema } from '@/users/schemas/user.schema';
 import { Category, CategorySchema } from '@/category/schemas/category.schema';
 import { NotificationModule } from '@/notifications/notifications.module';
+import { VouchersModule } from '@/vouchers/vouchers.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { NotificationModule } from '@/notifications/notifications.module';
       { name: Category.name, schema: CategorySchema },
     ]),
     NotificationModule,
+    VouchersModule,
   ],
   controllers: [ReturnOrdersController, ReturnOrderAnalyticsController],
   providers: [ReturnOrdersService, ReturnOrderAnalyticsService],

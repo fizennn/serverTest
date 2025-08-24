@@ -54,6 +54,26 @@ export class ReturnOrderDto {
   @IsArray()
   @IsString({ each: true })
   images?: string[];
+
+  @ApiProperty({ 
+    description: 'URL video đính kèm (không bắt buộc)', 
+    example: 'https://example.com/video.mp4',
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  videoUrl?: string;
+
+  @ApiProperty({ 
+    description: 'Loại yêu cầu trả hàng', 
+    enum: ['refund', 'exchange'],
+    example: 'exchange',
+    required: false,
+    default: 'exchange'
+  })
+  @IsOptional()
+  @IsEnum(['refund', 'exchange'])
+  returnType?: 'refund' | 'exchange';
 }
 
 export class UpdateReturnStatusDto {
@@ -84,4 +104,16 @@ export class PaginatedReturnOrderResponseDto {
 
   @ApiProperty({ description: 'Tổng số trang', example: 5 })
   pages: number;
+
+  @ApiProperty({ description: 'Trang hiện tại', example: 1 })
+  currentPage: number;
+
+  @ApiProperty({ description: 'Số lượng item trên mỗi trang', example: 10 })
+  limit: number;
+
+  @ApiProperty({ description: 'Có trang tiếp theo không', example: true })
+  hasNextPage: boolean;
+
+  @ApiProperty({ description: 'Có trang trước đó không', example: false })
+  hasPrevPage: boolean;
 }

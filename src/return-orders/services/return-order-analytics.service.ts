@@ -474,4 +474,90 @@ export class ReturnOrderAnalyticsService {
       todayStatusStats: todayStatusStatsObj,
     };
   }
+
+  async getReturnTypeAnalysis(dateRange?: DateRangeQueryDto) {
+    const matchCondition = this.buildDateFilter(dateRange);
+
+    const returnTypeStats = await this.returnOrderModel.aggregate([
+      { $match: matchCondition },
+      {
+        $group: {
+          _id: '$returnType',
+          count: { $sum: 1 },
+          totalAmount: { $sum: '$totalRefundAmount' },
+          approvedCount: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'approved'] }, 1, 0],
+            },
+          },
+          completedCount: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'completed'] }, 1, 0],
+            },
+          },
+          rejectedCount: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0],
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          returnType: '$_id',
+          count: 1,
+          totalAmount: 1,
+          approvedCount: 1,
+          completedCount: 1,
+          rejectedCount: 1,
+          approvalRate: {
+            $cond: [
+              { $gt: ['$count', 0] },
+              { $multiply: [{ $divide: ['$approvedCount', '$count'] }, 100] },
+              0,
+            ],
+          },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    // Đảm bảo có cả refund và exchange trong kết quả
+    const result = {
+      refund: {
+        returnType: 'refund',
+        count: 0,
+        totalAmount: 0,
+        approvedCount: 0,
+        completedCount: 0,
+        rejectedCount: 0,
+        approvalRate: 0,
+      },
+      exchange: {
+        returnType: 'exchange',
+        count: 0,
+        totalAmount: 0,
+        approvedCount: 0,
+        completedCount: 0,
+        rejectedCount: 0,
+        approvalRate: 0,
+      },
+    };
+
+    returnTypeStats.forEach(stat => {
+      if (stat.returnType === 'refund' || stat.returnType === 'exchange') {
+        result[stat.returnType] = {
+          returnType: stat.returnType,
+          count: stat.count,
+          totalAmount: stat.totalAmount,
+          approvedCount: stat.approvedCount,
+          completedCount: stat.completedCount,
+          rejectedCount: stat.rejectedCount,
+          approvalRate: Math.round(stat.approvalRate * 100) / 100,
+        };
+      }
+    });
+
+    return result;
+  }
 }

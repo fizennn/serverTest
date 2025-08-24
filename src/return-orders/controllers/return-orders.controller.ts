@@ -90,7 +90,7 @@ export class ReturnOrdersController {
   @Get('my-returns')
   @ApiOperation({
     summary: 'Lấy danh sách yêu cầu trả hàng của khách hàng',
-    description: 'Lấy tất cả yêu cầu trả hàng của khách hàng hiện tại',
+    description: 'Lấy tất cả yêu cầu trả hàng của khách hàng hiện tại với phân trang',
   })
   @ApiQuery({
     name: 'page',
@@ -104,6 +104,12 @@ export class ReturnOrdersController {
     description: 'Số lượng item trên mỗi trang',
     example: 10,
   })
+  @ApiQuery({
+    name: 'returnType',
+    required: false,
+    description: 'Lọc theo loại trả hàng',
+    enum: ['refund', 'exchange'],
+  })
   @ApiResponse({
     status: 200,
     description: 'Danh sách yêu cầu trả hàng',
@@ -113,6 +119,7 @@ export class ReturnOrdersController {
     @CurrentUser() user: UserDocument,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('returnType') returnType?: string,
   ) {
     console.log('=== MY-RETURNS ENDPOINT CALLED ===');
     console.log('User object:', user);
@@ -149,6 +156,7 @@ export class ReturnOrdersController {
       userId,
       pageNumber,
       limitNumber,
+      returnType,
     );
 
     console.log('=== SERVICE RESULT ===');
@@ -160,11 +168,15 @@ export class ReturnOrdersController {
     console.log('Result.total type:', typeof result.total);
     console.log('Result.limit:', limitNumber);
 
-    // Đảm bảo response có đúng format
+    // Đảm bảo response có đúng format với đầy đủ thông tin
     const response = {
       data: result.data || [],
       total: result.total || 0,
-      pages: result.pages || 0
+      pages: result.pages || 0,
+      currentPage: pageNumber,
+      limit: limitNumber,
+      hasNextPage: pageNumber < result.pages,
+      hasPrevPage: pageNumber > 1
     };
 
     console.log('=== FINAL RESPONSE ===');
@@ -221,7 +233,7 @@ export class ReturnOrdersController {
   @Get()
   @ApiOperation({
     summary: 'Lấy tất cả yêu cầu trả hàng (Admin)',
-    description: 'Admin lấy tất cả yêu cầu trả hàng trong hệ thống',
+    description: 'Admin lấy tất cả yêu cầu trả hàng trong hệ thống với phân trang và lọc',
   })
   @ApiQuery({
     name: 'page',
@@ -241,6 +253,12 @@ export class ReturnOrdersController {
     description: 'Lọc theo trạng thái',
     enum: ['pending', 'approved', 'rejected', 'processing', 'completed'],
   })
+  @ApiQuery({
+    name: 'returnType',
+    required: false,
+    description: 'Lọc theo loại trả hàng',
+    enum: ['refund', 'exchange'],
+  })
   @ApiResponse({
     status: 200,
     description: 'Danh sách yêu cầu trả hàng',
@@ -250,14 +268,36 @@ export class ReturnOrdersController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('status') status?: string,
+    @Query('returnType') returnType?: string,
   ) {
-    const result = await this.returnOrdersService.getAllReturnRequests(page, limit, status);
+    // Validate query parameters
+    const pageNumber = page ? parseInt(page.toString()) : 1;
+    const limitNumber = limit ? parseInt(limit.toString()) : 10;
     
-    // Đảm bảo response có đúng format
+    if (isNaN(pageNumber) || pageNumber < 1) {
+      throw new BadRequestException('Số trang không hợp lệ');
+    }
+    
+    if (isNaN(limitNumber) || limitNumber < 1 || limitNumber > 100) {
+      throw new BadRequestException('Số lượng item trên trang không hợp lệ');
+    }
+
+    const result = await this.returnOrdersService.getAllReturnRequests(
+      pageNumber, 
+      limitNumber, 
+      status, 
+      returnType
+    );
+    
+    // Đảm bảo response có đúng format với đầy đủ thông tin
     const response = {
       data: result.data || [],
       total: result.total || 0,
-      pages: result.pages || 0
+      pages: result.pages || 0,
+      currentPage: pageNumber,
+      limit: limitNumber,
+      hasNextPage: pageNumber < result.pages,
+      hasPrevPage: pageNumber > 1
     };
 
     return response;
