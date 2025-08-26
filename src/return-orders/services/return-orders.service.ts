@@ -363,6 +363,259 @@ export class ReturnOrdersService {
     return result;
   }
 
+  async advancedSearchReturnOrders(
+    searchDto: any,
+  ): Promise<{ data: ReturnOrderDocument[]; total: number; pages: number }> {
+    const {
+      keyword,
+      status,
+      returnType,
+      startDate,
+      endDate,
+      minRefundAmount,
+      maxRefundAmount,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      page = 1,
+      limit = 10,
+    } = searchDto;
+
+    const skip = (page - 1) * limit;
+    const filter: any = {};
+
+    // Tìm kiếm theo từ khóa
+    if (keyword) {
+      const decodedKeyword = decodeURIComponent(keyword);
+      
+      // Kiểm tra xem keyword có phải là ObjectId hợp lệ không
+      const isObjectId = Types.ObjectId.isValid(decodedKeyword);
+      
+      if (isObjectId) {
+        // Nếu là ObjectId, tìm kiếm theo _id của return order hoặc orderId
+        filter.$or = [
+          { _id: new Types.ObjectId(decodedKeyword) },
+          { orderId: new Types.ObjectId(decodedKeyword) }
+        ];
+      } else {
+        // Nếu không phải ObjectId, tìm kiếm theo text
+        const searchPattern = decodedKeyword
+          .split(' ')
+          .map(term => `(?=.*${term})`)
+          .join('');
+        
+        // Tìm kiếm trong reason và description
+        filter.$or = [
+          { reason: { $regex: searchPattern, $options: 'i' } },
+          { description: { $regex: searchPattern, $options: 'i' } }
+        ];
+      }
+    }
+
+    // Filter theo status
+    if (status) {
+      filter.status = status;
+    }
+
+    // Filter theo returnType
+    if (returnType) {
+      filter.returnType = returnType;
+    }
+
+    // Filter theo khoảng thời gian
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) {
+        filter.createdAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        filter.createdAt.$lte = new Date(endDate);
+      }
+    }
+
+    // Filter theo khoảng tiền hoàn trả
+    if (minRefundAmount !== undefined || maxRefundAmount !== undefined) {
+      filter.totalRefundAmount = {};
+      if (minRefundAmount !== undefined) {
+        filter.totalRefundAmount.$gte = minRefundAmount;
+      }
+      if (maxRefundAmount !== undefined) {
+        filter.totalRefundAmount.$lte = maxRefundAmount;
+      }
+    }
+
+    console.log('Advanced search filter:', JSON.stringify(filter, null, 2));
+
+    // Nếu có keyword và không phải ObjectId, cần tìm kiếm theo tên/email khách hàng
+    let data: any[] = [];
+    let total = 0;
+
+    if (keyword && !Types.ObjectId.isValid(decodeURIComponent(keyword))) {
+      // Sử dụng aggregation để tìm kiếm theo tên/email khách hàng
+      const searchPattern = decodeURIComponent(keyword)
+        .split(' ')
+        .map(term => `(?=.*${term})`)
+        .join('');
+
+      const pipeline: any[] = [
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'customerId',
+            foreignField: '_id',
+            as: 'customer'
+          }
+        },
+        {
+          $unwind: '$customer'
+        },
+        {
+          $lookup: {
+            from: 'orders',
+            localField: 'orderId',
+            foreignField: '_id',
+            as: 'order'
+          }
+        },
+        {
+          $unwind: '$order'
+        },
+        {
+          $lookup: {
+            from: 'products',
+            localField: 'items.productId',
+            foreignField: '_id',
+            as: 'products'
+          }
+        },
+        {
+          $match: {
+            $or: [
+              { reason: { $regex: searchPattern, $options: 'i' } },
+              { description: { $regex: searchPattern, $options: 'i' } },
+              { 'customer.name': { $regex: searchPattern, $options: 'i' } },
+              { 'customer.email': { $regex: searchPattern, $options: 'i' } }
+            ]
+          }
+        }
+      ];
+
+      // Thêm các filter khác
+      if (status) {
+        pipeline.push({ $match: { status } } as any);
+      }
+      if (returnType) {
+        pipeline.push({ $match: { returnType } } as any);
+      }
+      if (startDate || endDate) {
+        const dateFilter: any = {};
+        if (startDate) {
+          dateFilter.$gte = new Date(startDate);
+        }
+        if (endDate) {
+          dateFilter.$lte = new Date(endDate);
+        }
+        pipeline.push({ $match: { createdAt: dateFilter } } as any);
+      }
+      if (minRefundAmount !== undefined || maxRefundAmount !== undefined) {
+        const amountFilter: any = {};
+        if (minRefundAmount !== undefined) {
+          amountFilter.$gte = minRefundAmount;
+        }
+        if (maxRefundAmount !== undefined) {
+          amountFilter.$lte = maxRefundAmount;
+        }
+        pipeline.push({ $match: { totalRefundAmount: amountFilter } } as any);
+      }
+
+      // Thêm sort
+      if (sortBy === 'customerName') {
+        pipeline.push({ $sort: { 'customer.name': sortOrder === 'asc' ? 1 : -1 } } as any);
+      } else {
+        pipeline.push({ $sort: { [sortBy]: sortOrder === 'asc' ? 1 : -1 } } as any);
+      }
+
+      // Thêm skip và limit
+      pipeline.push({ $skip: skip } as any);
+      pipeline.push({ $limit: limit } as any);
+
+      // Thực hiện aggregation
+      const [aggregationResult, totalResult] = await Promise.all([
+        this.returnOrderModel.aggregate(pipeline),
+        this.returnOrderModel.aggregate([
+          ...pipeline.slice(0, -2), // Loại bỏ skip và limit
+          { $count: 'total' }
+        ])
+      ]);
+
+      data = aggregationResult;
+      total = totalResult.length > 0 ? totalResult[0].total : 0;
+
+    } else {
+      // Sử dụng query thông thường nếu không có keyword hoặc keyword là ObjectId
+      // Xây dựng sort object
+      let sortObject: any = {};
+      
+      if (sortBy === 'customerName') {
+        // Đối với customerName, cần sort sau khi populate
+        sortObject = { createdAt: sortOrder === 'asc' ? 1 : -1 };
+      } else {
+        sortObject[sortBy] = sortOrder === 'asc' ? 1 : -1;
+      }
+
+      console.log('Sort object:', sortObject);
+
+      // Thực hiện query với populate
+      const [queryResult, totalResult] = await Promise.all([
+        this.returnOrderModel
+          .find(filter)
+          .populate('orderId', 'total createdAt status')
+          .populate('customerId', 'name email')
+          .populate('items.productId', 'name images')
+          .sort(sortObject)
+          .skip(skip)
+          .limit(limit)
+          .exec(),
+        this.returnOrderModel.countDocuments(filter),
+      ]);
+
+      data = queryResult;
+      total = totalResult;
+
+      // Nếu sort theo customerName, cần sort lại sau khi populate
+      if (sortBy === 'customerName') {
+        data.sort((a, b) => {
+          const customerA = (a.customerId as any)?.name || '';
+          const customerB = (b.customerId as any)?.name || '';
+          
+          if (sortOrder === 'asc') {
+            return customerA.localeCompare(customerB);
+          } else {
+            return customerB.localeCompare(customerA);
+          }
+        });
+      }
+    }
+
+    console.log('Found return orders:', data.length);
+    console.log('Total count:', total);
+
+    // Đảm bảo total và limit là số hợp lệ
+    const validTotal = typeof total === 'number' ? total : 0;
+    const validLimit = typeof limit === 'number' && limit > 0 ? limit : 10;
+    
+    const calculatedPages = validLimit > 0 ? Math.ceil(validTotal / validLimit) : 0;
+    
+    const result = {
+      data,
+      total: validTotal,
+      pages: calculatedPages,
+    };
+
+    console.log('Advanced search result:', JSON.stringify(result, null, 2));
+
+    return result;
+  }
+
   async debugAllReturns(): Promise<any> {
     const allReturns = await this.returnOrderModel
       .find({})

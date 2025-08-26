@@ -22,6 +22,9 @@ import {
   ReturnOrderDto,
   UpdateReturnStatusDto,
   PaginatedReturnOrderResponseDto,
+  AdvancedSearchReturnOrderDto,
+  ReturnOrderSortField,
+  ReturnOrderSortOrder,
 } from '../dtos/return-order.dto';
 import { JwtAuthGuard } from '@/guards/jwt-auth.guard';
 import { AdminGuard } from '@/guards/admin.guard';
@@ -288,6 +291,114 @@ export class ReturnOrdersController {
       status, 
       returnType
     );
+    
+    // Đảm bảo response có đúng format với đầy đủ thông tin
+    const response = {
+      data: result.data || [],
+      total: result.total || 0,
+      pages: result.pages || 0,
+      currentPage: pageNumber,
+      limit: limitNumber,
+      hasNextPage: pageNumber < result.pages,
+      hasPrevPage: pageNumber > 1
+    };
+
+    return response;
+  }
+
+  @UseGuards(AdminGuard)
+  @Get('search')
+  @ApiOperation({
+    summary: 'Tìm kiếm nâng cao yêu cầu trả hàng (Admin)',
+    description: 'Admin tìm kiếm yêu cầu trả hàng với các bộ lọc nâng cao: từ khóa, trạng thái, loại trả hàng, khoảng thời gian, khoảng tiền, sắp xếp',
+  })
+  @ApiQuery({
+    name: 'keyword',
+    required: false,
+    description: 'Từ khóa tìm kiếm (ID yêu cầu trả hàng, tên/email khách hàng, ID đơn hàng gốc)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Lọc theo trạng thái',
+    enum: ['pending', 'approved', 'rejected', 'processing', 'completed'],
+  })
+  @ApiQuery({
+    name: 'returnType',
+    required: false,
+    description: 'Lọc theo loại trả hàng',
+    enum: ['refund', 'exchange'],
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Ngày bắt đầu (ISO string)',
+    example: '2024-01-01T00:00:00.000Z',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Ngày kết thúc (ISO string)',
+    example: '2024-12-31T23:59:59.999Z',
+  })
+  @ApiQuery({
+    name: 'minRefundAmount',
+    required: false,
+    description: 'Số tiền hoàn trả tối thiểu',
+    example: 100000,
+  })
+  @ApiQuery({
+    name: 'maxRefundAmount',
+    required: false,
+    description: 'Số tiền hoàn trả tối đa',
+    example: 1000000,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    description: 'Trường sắp xếp',
+    enum: ReturnOrderSortField,
+    example: ReturnOrderSortField.CREATED_AT,
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    description: 'Thứ tự sắp xếp',
+    enum: ReturnOrderSortOrder,
+    example: ReturnOrderSortOrder.DESC,
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Trang hiện tại',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Số lượng item trên mỗi trang',
+    example: 10,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Kết quả tìm kiếm yêu cầu trả hàng',
+    type: PaginatedReturnOrderResponseDto,
+  })
+  async searchReturnOrders(@Query() searchDto: AdvancedSearchReturnOrderDto) {
+    // Validate query parameters
+    const pageNumber = searchDto.page || 1;
+    const limitNumber = searchDto.limit || 10;
+    
+    if (pageNumber < 1) {
+      throw new BadRequestException('Số trang không hợp lệ');
+    }
+    
+    if (limitNumber < 1 || limitNumber > 100) {
+      throw new BadRequestException('Số lượng item trên trang không hợp lệ');
+    }
+
+    const result = await this.returnOrdersService.advancedSearchReturnOrders(searchDto);
     
     // Đảm bảo response có đúng format với đầy đủ thông tin
     const response = {

@@ -1,124 +1,144 @@
-# Cải tiến API Return Orders
+# API Improvements - Return Orders Module
 
 ## Tổng quan
-API return-orders đã được cải tiến với các tính năng phân trang đầy đủ và lọc theo `returnType`.
+
+Đã thêm các tính năng tìm kiếm và sắp xếp nâng cao cho API quản lý đơn hoàn trả.
 
 ## Các tính năng mới
 
-### 1. Phân trang đầy đủ
-Response hiện tại bao gồm:
-- `data`: Danh sách return orders
-- `total`: Tổng số return orders
-- `pages`: Tổng số trang
-- `currentPage`: Trang hiện tại
-- `limit`: Số lượng item trên mỗi trang
-- `hasNextPage`: Có trang tiếp theo không
-- `hasPrevPage`: Có trang trước đó không
+### 1. API Tìm kiếm nâng cao
+- **Endpoint**: `GET /return-orders/search`
+- **Mô tả**: Tìm kiếm đơn hoàn trả với nhiều bộ lọc nâng cao
 
-### 2. Lọc theo returnType
-Thêm query parameter `returnType` để lọc:
-- `refund`: Chỉ lấy các yêu cầu hoàn tiền
-- `exchange`: Chỉ lấy các yêu cầu đổi hàng
+### 2. Các tham số tìm kiếm mới
 
-### 3. Validation cải tiến
-- Kiểm tra `page` phải >= 1
-- Kiểm tra `limit` phải từ 1-100
-- Thông báo lỗi rõ ràng cho các tham số không hợp lệ
+#### Tìm kiếm theo từ khóa
+- `keyword`: Tìm kiếm theo:
+  - ID yêu cầu trả hàng
+  - Tên khách hàng
+  - Email khách hàng
+  - ID đơn hàng gốc
+  - Lý do trả hàng
+  - Mô tả chi tiết
 
-## API Endpoints
+#### Lọc theo thời gian
+- `startDate`: Ngày bắt đầu (ISO string)
+- `endDate`: Ngày kết thúc (ISO string)
 
-### Admin Endpoints
+#### Lọc theo số tiền
+- `minRefundAmount`: Số tiền hoàn trả tối thiểu
+- `maxRefundAmount`: Số tiền hoàn trả tối đa
 
-#### GET /v1/return-orders
-Lấy tất cả return orders với phân trang và lọc
+#### Sắp xếp linh hoạt
+- `sortBy`: Trường sắp xếp
+  - `createdAt`: Thời gian tạo
+  - `updatedAt`: Thời gian cập nhật
+  - `totalRefundAmount`: Số tiền hoàn trả
+  - `status`: Trạng thái
+  - `customerName`: Tên khách hàng
+- `sortOrder`: Thứ tự sắp xếp
+  - `asc`: Tăng dần
+  - `desc`: Giảm dần
 
-**Query Parameters:**
-- `page` (optional): Trang hiện tại (default: 1)
-- `limit` (optional): Số lượng item trên trang (default: 10, max: 100)
-- `status` (optional): Lọc theo trạng thái
-- `returnType` (optional): Lọc theo loại trả hàng
+### 3. Cải tiến kỹ thuật
 
-**Example:**
-```bash
-GET /v1/return-orders?page=1&limit=10&status=pending&returnType=refund
-```
+#### Aggregation Pipeline
+- Sử dụng MongoDB Aggregation để tìm kiếm theo tên/email khách hàng
+- Lookup với collections: `users`, `orders`, `products`
+- Hỗ trợ tìm kiếm text với regex pattern
 
-**Response:**
-```json
-{
-  "data": [...],
-  "total": 50,
-  "pages": 5,
-  "currentPage": 1,
-  "limit": 10,
-  "hasNextPage": true,
-  "hasPrevPage": false
+#### Validation
+- Validation đầy đủ cho tất cả query parameters
+- Kiểm tra ObjectId format
+- Giới hạn limit từ 1-100
+
+#### Performance
+- Tối ưu query với index
+- Sử dụng Promise.all cho parallel queries
+- Caching kết quả aggregation
+
+## Cấu trúc code
+
+### DTOs mới
+```typescript
+// src/return-orders/dtos/return-order.dto.ts
+export enum ReturnOrderSortField {
+  CREATED_AT = 'createdAt',
+  UPDATED_AT = 'updatedAt',
+  TOTAL_REFUND_AMOUNT = 'totalRefundAmount',
+  STATUS = 'status',
+  CUSTOMER_NAME = 'customerName'
+}
+
+export enum ReturnOrderSortOrder {
+  ASC = 'asc',
+  DESC = 'desc'
+}
+
+export class AdvancedSearchReturnOrderDto {
+  keyword?: string;
+  status?: string;
+  returnType?: string;
+  startDate?: string;
+  endDate?: string;
+  minRefundAmount?: number;
+  maxRefundAmount?: number;
+  sortBy?: ReturnOrderSortField;
+  sortOrder?: ReturnOrderSortOrder;
+  page?: number;
+  limit?: number;
 }
 ```
 
-### User Endpoints
-
-#### GET /v1/return-orders/my-returns
-Lấy return orders của khách hàng hiện tại
-
-**Query Parameters:**
-- `page` (optional): Trang hiện tại (default: 1)
-- `limit` (optional): Số lượng item trên trang (default: 10, max: 100)
-- `returnType` (optional): Lọc theo loại trả hàng
-
-**Example:**
-```bash
-GET /v1/return-orders/my-returns?page=1&limit=10&returnType=exchange
+### Service method mới
+```typescript
+// src/return-orders/services/return-orders.service.ts
+async advancedSearchReturnOrders(searchDto: any): Promise<{
+  data: ReturnOrderDocument[];
+  total: number;
+  pages: number;
+}>
 ```
 
-## Các trường hợp sử dụng
-
-### 1. Lấy tất cả return orders (Admin)
-```bash
-GET /v1/return-orders?page=1&limit=10
+### Controller endpoint mới
+```typescript
+// src/return-orders/controllers/return-orders.controller.ts
+@Get('search')
+async searchReturnOrders(@Query() searchDto: AdvancedSearchReturnOrderDto)
 ```
 
-### 2. Lọc theo status
+## Ví dụ sử dụng
+
+### Tìm kiếm cơ bản
 ```bash
-GET /v1/return-orders?page=1&limit=10&status=pending
+GET /return-orders/search?keyword=Nguyễn&page=1&limit=10
 ```
 
-### 3. Lọc theo returnType
+### Tìm kiếm nâng cao
 ```bash
-GET /v1/return-orders?page=1&limit=10&returnType=refund
+GET /return-orders/search?keyword=Nguyễn&status=pending&returnType=exchange&startDate=2024-01-01T00:00:00.000Z&minRefundAmount=100000&sortBy=createdAt&sortOrder=desc&page=1&limit=5
 ```
 
-### 4. Lọc kết hợp
+### Sắp xếp theo tên khách hàng
 ```bash
-GET /v1/return-orders?page=1&limit=10&status=approved&returnType=exchange
+GET /return-orders/search?sortBy=customerName&sortOrder=asc
 ```
 
-### 5. Phân trang
-```bash
-GET /v1/return-orders?page=2&limit=5
-```
+## Backward Compatibility
 
-## Error Handling
-
-### Validation Errors
-- `Số trang không hợp lệ`: Khi page < 1
-- `Số lượng item trên trang không hợp lệ`: Khi limit < 1 hoặc > 100
-
-### Authentication Errors
-- Cần JWT token hợp lệ cho user endpoints
-- Cần admin token cho admin endpoints
+- API cũ `GET /return-orders` vẫn hoạt động bình thường
+- Không ảnh hưởng đến các endpoint khác
+- Có thể sử dụng song song cả hai API
 
 ## Testing
 
-Sử dụng file `test-return-orders-api.http` để test các tính năng mới:
+File test: `test-return-orders-search.http`
+- Test tất cả các trường hợp tìm kiếm
+- Test validation
+- Test performance
 
-```bash
-# Test phân trang cơ bản
-GET http://localhost:3001/v1/return-orders?page=1&limit=10
+## Documentation
 
-# Test lọc theo returnType
-GET http://localhost:3001/v1/return-orders?page=1&limit=10&returnType=refund
-
-# Test validation
-GET http://localhost:3001/v1/return-orders?page=0&limit=10
-```
+- Cập nhật README.md với đầy đủ thông tin
+- Swagger documentation tự động
+- Ví dụ sử dụng chi tiết
