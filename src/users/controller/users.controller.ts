@@ -18,6 +18,7 @@ import { UserDto } from '../dtos/user.dto';
 import { CreateAddressDto, UpdateAddressDto } from '../dtos/address.dto';
 import { UsersService } from '../services/users.service';
 import { PaginatedUsersDto } from '../dtos/paginated-users.dto';
+import { UserSearchDto } from '../dtos/user-search.dto';
 import {
   ApiBearerAuth,
   ApiTags,
@@ -174,6 +175,118 @@ export class UsersController {
     const limitNumber = parseInt(limit, 10);
 
     return this.usersService.findAllAdmins(pageNumber, limitNumber);
+  }
+
+  @Serialize(PaginatedUsersDto)
+  @UseGuards(AdminGuard)
+  @Get('regular')
+  @ApiOperation({ 
+    summary: 'Tìm kiếm user thường nâng cao',
+    description: 'Lấy danh sách tất cả người dùng thường (isAdmin = false) với tìm kiếm nâng cao: từ khóa (tên, email, ID), tên, email, trạng thái, vai trò, sắp xếp...',
+  })
+  @ApiQuery({
+    name: 'keyword',
+    description: 'Từ khóa tìm kiếm (tên, email) hoặc ID user (ObjectId)',
+    required: false,
+    type: String,
+    example: 'john hoặc 507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'name',
+    description: 'Tên user',
+    required: false,
+    type: String,
+    example: 'John Doe',
+  })
+  @ApiQuery({
+    name: 'email',
+    description: 'Email user',
+    required: false,
+    type: String,
+    example: 'john@example.com',
+  })
+  @ApiQuery({
+    name: 'isActive',
+    description: 'Trạng thái hoạt động (true/false)',
+    required: false,
+    type: String,
+    example: 'true',
+  })
+  @ApiQuery({
+    name: 'roleId',
+    description: 'ID vai trò',
+    required: false,
+    type: String,
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    description: 'Sắp xếp theo (name, email, createdAt, isActive)',
+    required: false,
+    type: String,
+    example: 'createdAt',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    description: 'Thứ tự sắp xếp (asc, desc)',
+    required: false,
+    type: String,
+    example: 'desc',
+  })
+  @ApiQuery({
+    name: 'page',
+    description: 'Số trang',
+    required: false,
+    type: Number,
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Số lượng item mỗi trang',
+    required: false,
+    type: Number,
+    example: 20,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách user thường thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string', example: '665f1e2b2c8b2a0012a4e123' },
+              name: { type: 'string', example: 'John Doe' },
+              email: { type: 'string', example: 'john@example.com' },
+              isAdmin: { type: 'boolean', example: false },
+              isActive: { type: 'boolean', example: true },
+              roleId: { 
+                type: 'object', 
+                example: { 
+                  _id: '665f1e2b2c8b2a0012a4e123', 
+                  name: 'Customer',
+                  description: 'Khách hàng thông thường'
+                } 
+              },
+              createdAt: { type: 'string', format: 'date-time' },
+            },
+          },
+        },
+        total: { type: 'number', example: 100 },
+        page: { type: 'number', example: 1 },
+        pages: { type: 'number', example: 5 },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền xem danh sách user thường.',
+  })
+  async getRegularUsers(@Query() searchDto: UserSearchDto) {
+    return this.usersService.findAllRegularUsersAdvanced(searchDto);
   }
 
   @Serialize(PaginatedUsersDto)
@@ -1226,6 +1339,68 @@ export class UsersController {
   ) {
     const dateRange = startDate && endDate ? { startDate, endDate } : undefined;
     return this.usersService.getEmployeeActivityStatistics(dateRange);
+  }
+
+  @Put(':id/status')
+  @UseGuards(AdminGuard)
+  @ApiOperation({ 
+    summary: 'Cập nhật trạng thái hoạt động của user',
+    description: 'Cập nhật trạng thái hoạt động (isActive) của một user theo ID (chỉ admin).',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID của user',
+    example: '665f1e2b2c8b2a0012a4e123',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        isActive: { type: 'boolean', example: true, description: 'Trạng thái hoạt động' },
+      },
+      required: ['isActive'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật trạng thái hoạt động thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        _id: { type: 'string', example: '665f1e2b2c8b2a0012a4e123' },
+        name: { type: 'string', example: 'John Doe' },
+        email: { type: 'string', example: 'john@example.com' },
+        isAdmin: { type: 'boolean', example: false },
+        isActive: { type: 'boolean', example: true },
+        roleId: { 
+          type: 'object', 
+          example: { 
+            _id: '665f1e2b2c8b2a0012a4e123', 
+            name: 'Customer',
+            description: 'Khách hàng thông thường'
+          } 
+        },
+        createdAt: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'ID không hợp lệ hoặc dữ liệu không hợp lệ',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Không tìm thấy user',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập. Chỉ admin mới có quyền cập nhật trạng thái hoạt động.',
+  })
+  async updateUserStatus(
+    @Param('id') id: string,
+    @Body() body: { isActive: boolean },
+  ) {
+    return this.usersService.updateUserStatus(id, body.isActive);
   }
 
 }

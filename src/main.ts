@@ -123,11 +123,11 @@ async function bootstrap() {
       }
     },
   });
-
+  const baseUrl = process.env.BASE_URL;
   app.enableShutdownHooks();
   //them code 15phut tu ping server 1 lan
   setInterval(() => {
-    axios.get('https://fizennn.click/v1/products');
+    axios.get(baseUrl +'/products');
   }, 15 * 60 * 1000); // 15 phút
 
   const port = process.env.PORT || 3001;

@@ -683,6 +683,179 @@ export class UsersService {
     };
   }
 
+  async findAllRegularUsers(
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<PaginatedResponse<UserDocument>> {
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      this.userModel
+        .find({ isAdmin: false })
+        .populate({
+          path: 'roleId',
+          select:
+            'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt',
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.userModel.countDocuments({ isAdmin: false }),
+    ]);
+
+    return {
+      items: users,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+    };
+  }
+
+  async findAllRegularUsersAdvanced(
+    searchDto: {
+      keyword?: string;
+      name?: string;
+      email?: string;
+      isActive?: string;
+      roleId?: string;
+      sortBy?: string;
+      sortOrder?: string;
+      page?: string;
+      limit?: string;
+    },
+  ): Promise<PaginatedResponse<UserDocument>> {
+    const page = parseInt(searchDto.page || '1', 10);
+    const limit = parseInt(searchDto.limit || '20', 10);
+    const skip = (page - 1) * limit;
+
+    // Xây dựng query filter
+    const filter: any = { isAdmin: false };
+
+    // Tìm kiếm theo keyword (tên, email, hoặc ID)
+    if (searchDto.keyword) {
+      const keyword = searchDto.keyword.trim();
+      
+      // Kiểm tra xem keyword có phải là ObjectId không
+      if (Types.ObjectId.isValid(keyword)) {
+        filter.$or = [
+          { _id: keyword },
+          { name: { $regex: keyword, $options: 'i' } },
+          { email: { $regex: keyword, $options: 'i' } },
+        ];
+      } else {
+        filter.$or = [
+          { name: { $regex: keyword, $options: 'i' } },
+          { email: { $regex: keyword, $options: 'i' } },
+        ];
+      }
+    }
+
+    // Tìm kiếm theo tên
+    if (searchDto.name) {
+      filter.name = { $regex: searchDto.name.trim(), $options: 'i' };
+    }
+
+    // Tìm kiếm theo email
+    if (searchDto.email) {
+      filter.email = { $regex: searchDto.email.trim(), $options: 'i' };
+    }
+
+    // Tìm kiếm theo trạng thái hoạt động
+    if (searchDto.isActive !== undefined && searchDto.isActive !== '') {
+      filter.isActive = searchDto.isActive === 'true';
+    }
+
+    // Tìm kiếm theo vai trò
+    if (searchDto.roleId) {
+      filter.roleId = searchDto.roleId;
+    }
+
+    // Xây dựng sort options
+    let sortOptions: any = { createdAt: -1 }; // Mặc định sắp xếp theo createdAt giảm dần
+
+    if (searchDto.sortBy) {
+      const sortOrder = searchDto.sortOrder === 'asc' ? 1 : -1;
+      
+      switch (searchDto.sortBy) {
+        case 'name':
+          sortOptions = { name: sortOrder };
+          break;
+        case 'email':
+          sortOptions = { email: sortOrder };
+          break;
+        case 'isActive':
+          sortOptions = { isActive: sortOrder };
+          break;
+        case 'createdAt':
+          sortOptions = { createdAt: sortOrder };
+          break;
+        default:
+          sortOptions = { createdAt: -1 };
+      }
+    }
+
+    const [users, total] = await Promise.all([
+      this.userModel
+        .find(filter)
+        .populate({
+          path: 'roleId',
+          select:
+            'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt',
+        })
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.userModel.countDocuments(filter),
+    ]);
+
+    return {
+      items: users,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+    };
+  }
+
+  async updateUserStatus(
+    userId: string,
+    isActive: boolean,
+  ): Promise<UserDocument> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('ID user không hợp lệ');
+    }
+
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy user');
+    }
+
+    // Không cho phép admin vô hiệu hóa chính mình
+    if (user.isAdmin) {
+      throw new BadRequestException('Không thể thay đổi trạng thái của admin');
+    }
+
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { isActive },
+        { new: true }
+      )
+      .populate({
+        path: 'roleId',
+        select:
+          'name description isOrder isProduct isCategory isPost isVoucher isBanner isAnalytic isReturn isUser isRole isActive priority createdAt updatedAt',
+      })
+      .exec();
+
+    if (!updatedUser) {
+      throw new NotFoundException('Không tìm thấy user sau khi cập nhật');
+    }
+
+    return updatedUser;
+  }
+
   async findAllByPermission(
     permission: string,
     page: number = 1,

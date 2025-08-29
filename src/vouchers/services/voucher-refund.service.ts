@@ -104,7 +104,7 @@ export class VoucherRefundService {
       disCount: 100, // Giảm 100% tương đương với giá trị voucher
       condition: voucherCondition,
       limit: voucherValue, // Giới hạn giảm giá bằng giá trị voucher
-      stock: 0, // Voucher hoàn trả không cần stock vì chỉ dành riêng cho 1 user
+      stock: 1, // Chỉ 1 voucher cho 1 lần refund
       start: startDate,
       end: endDate,
       userId: [new Types.ObjectId(userId)],
@@ -220,12 +220,8 @@ export class VoucherRefundService {
     orderId?: string,
     returnOrderId?: string,
   ): string {
-    // Xử lý ID để hiển thị ngắn gọn
-    const shortOrderId = orderId ? this.getShortId(orderId) : '';
-    const shortReturnId = returnOrderId ? this.getShortId(returnOrderId) : '';
-    
-    const orderInfo = shortOrderId ? ` cho đơn hàng #${shortOrderId}` : '';
-    const returnInfo = shortReturnId ? ` (Yêu cầu trả hàng: #${shortReturnId})` : '';
+    const orderInfo = orderId ? ` cho đơn hàng ${orderId}` : '';
+    const returnInfo = returnOrderId ? ` (Yêu cầu trả hàng: ${returnOrderId})` : '';
     
     return `Bạn đã nhận được voucher hoàn tiền${orderInfo}${returnInfo}. 
     
@@ -283,17 +279,12 @@ Voucher có thể sử dụng cho đơn hàng tiếp theo với điều kiện t
     reason?: string,
   ): Promise<void> {
     try {
-      // Xử lý ID để hiển thị ngắn gọn
-      const shortUserId = this.getShortId(userId);
-      const shortOrderId = orderId ? this.getShortId(orderId) : '';
-      const shortReturnId = returnOrderId ? this.getShortId(returnOrderId) : '';
-      
-      const adminMessage = `Đã tạo voucher hoàn tiền cho user #${shortUserId}
+      const adminMessage = `Đã tạo voucher hoàn tiền cho user ${userId}
 Số tiền hoàn: ${this.formatCurrency(refundAmount)}
 Giá trị voucher: ${this.formatCurrency(voucherValue)}
 Lý do: ${reason || 'Không có'}
-${shortOrderId ? `Đơn hàng: #${shortOrderId}` : ''}
-${shortReturnId ? `Yêu cầu trả hàng: #${shortReturnId}` : ''}`;
+${orderId ? `Đơn hàng: ${orderId}` : ''}
+${returnOrderId ? `Yêu cầu trả hàng: ${returnOrderId}` : ''}`;
 
       await this.notificationService.sendNotificationToAdmins(
         'Voucher hoàn tiền đã được tạo',
@@ -326,26 +317,6 @@ ${shortReturnId ? `Yêu cầu trả hàng: #${shortReturnId}` : ''}`;
   }
 
   /**
-   * Lấy ID ngắn gọn từ ObjectId hoặc string
-   */
-  private getShortId(id: string): string {
-    if (!id) return '';
-    
-    // Nếu là ObjectId, lấy 8 ký tự cuối
-    if (id.length === 24) {
-      return id.slice(-8);
-    }
-    
-    // Nếu là string ngắn, trả về nguyên bản
-    if (id.length <= 8) {
-      return id;
-    }
-    
-    // Nếu là string dài, lấy 8 ký tự cuối
-    return id.slice(-8);
-  }
-
-  /**
    * Lấy thông tin voucher refund của user
    */
   async getUserRefundVouchers(userId: string): Promise<VoucherDocument[]> {
@@ -359,8 +330,7 @@ ${shortReturnId ? `Yêu cầu trả hàng: #${shortReturnId}` : ''}`;
       isDisable: false,
       start: { $lte: now },
       end: { $gte: now },
-      // Bỏ filter stock vì stock chỉ giảm khi user nhận voucher, không phải khi sử dụng
-      // stock: { $gt: 0 },
+      stock: { $gt: 0 },
     }).sort({ createdAt: -1 });
   }
 
@@ -400,10 +370,10 @@ ${shortReturnId ? `Yêu cầu trả hàng: #${shortReturnId}` : ''}`;
       return { isValid: false, message: 'Voucher không trong thời gian hiệu lực' };
     }
 
-    // Bỏ kiểm tra stock vì stock chỉ giảm khi user nhận voucher, không phải khi sử dụng
-    // if (voucher.stock <= 0) {
-    //   return { isValid: false, message: 'Voucher đã hết' };
-    // }
+    // Kiểm tra stock
+    if (voucher.stock <= 0) {
+      return { isValid: false, message: 'Voucher đã hết' };
+    }
 
     // Kiểm tra điều kiện sử dụng
     if (orderAmount < voucher.condition) {
@@ -417,7 +387,7 @@ ${shortReturnId ? `Yêu cầu trả hàng: #${shortReturnId}` : ''}`;
   }
 
   /**
-   * Sử dụng voucher (không cần giảm stock vì voucher hoàn trả)
+   * Sử dụng voucher (giảm stock)
    */
   async useVoucher(voucherId: string): Promise<void> {
     const voucher = await this.voucherModel.findById(voucherId);
@@ -425,10 +395,11 @@ ${shortReturnId ? `Yêu cầu trả hàng: #${shortReturnId}` : ''}`;
       throw new NotFoundException('Voucher không tồn tại');
     }
 
-    // Voucher hoàn trả không cần giảm stock vì chỉ dành riêng cho 1 user
-    // voucher.stock -= 1;
-    // await voucher.save();
-    
-    console.log('Voucher hoàn trả đã được sử dụng:', voucherId);
+    if (voucher.stock <= 0) {
+      throw new BadRequestException('Voucher đã hết');
+    }
+
+    voucher.stock -= 1;
+    await voucher.save();
   }
 }
