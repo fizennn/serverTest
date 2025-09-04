@@ -7,10 +7,11 @@
 ## Tính năng chính
 
 ### 1. Tạo voucher hoàn tiền tự động
-- Tự động tính toán giá trị voucher (tăng 10% so với số tiền hoàn)
-- Tạo điều kiện sử dụng hợp lý (60% giá trị voucher)
+- Tự động tính toán giá trị voucher (bằng chính xác số tiền hoàn)
+- Tạo điều kiện sử dụng là 0 đồng (không có điều kiện tối thiểu)
 - Thời hạn sử dụng mặc định 30 ngày
 - Gửi thông báo cho user và admin
+- Đặt stock = 0 sau khi tạo thành công (đánh dấu voucher đã được sử dụng)
 
 ### 2. Quản lý voucher
 - Lấy danh sách voucher của user
@@ -70,7 +71,7 @@ const voucherResult = await this.voucherRefundService.createRefundVoucher({
 });
 
 console.log('Voucher created:', voucherResult.voucher._id);
-console.log('Voucher value:', voucherResult.voucherValue); // 550k VND (tăng 10%)
+console.log('Voucher value:', voucherResult.voucherValue); // 500k VND (bằng chính xác số tiền hoàn)
 ```
 
 ### 4. Lấy voucher của user
@@ -156,14 +157,14 @@ Authorization: Bearer <user_token>
 
 ### 1. Giá trị voucher
 ```typescript
-// Tăng 10% so với số tiền hoàn để khuyến khích mua hàng
-voucherValue = refundAmount * 1.1
+// Giá trị voucher bằng chính xác số tiền hoàn
+voucherValue = refundAmount
 ```
 
 ### 2. Điều kiện sử dụng
 ```typescript
-// Điều kiện bằng 60% giá trị voucher
-condition = voucherValue * 0.6
+// Điều kiện sử dụng là 0 đồng (không có điều kiện tối thiểu)
+condition = 0
 ```
 
 ### 3. Thời hạn sử dụng
@@ -179,7 +180,8 @@ Service này đã được tích hợp tự động vào `ReturnOrdersService`. 
 1. Tạo voucher hoàn tiền
 2. Gửi thông báo cho user
 3. Gửi thông báo cho admin
-4. Log kết quả
+4. Đặt stock = 0 (đánh dấu voucher đã được sử dụng)
+5. Log kết quả
 
 ## Lợi ích
 
@@ -190,8 +192,8 @@ Service này đã được tích hợp tự động vào `ReturnOrdersService`. 
 - ✅ Giảm chi phí giao dịch payment gateway
 
 ### Cho khách hàng:
-- ✅ Nhận giá trị cao hơn (tăng 10%)
-- ✅ Linh hoạt trong việc sử dụng
+- ✅ Nhận giá trị chính xác số tiền hoàn
+- ✅ Linh hoạt trong việc sử dụng (không có điều kiện tối thiểu)
 - ✅ Không bị trừ phí giao dịch
 - ✅ Có thời gian cân nhắc mua hàng
 

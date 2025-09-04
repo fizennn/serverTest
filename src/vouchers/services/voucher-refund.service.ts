@@ -85,7 +85,7 @@ export class VoucherRefundService {
     
     // Tính toán điều kiện sử dụng voucher
     const voucherCondition = condition || this.calculateVoucherCondition(voucherValue);
-    console.log('📋 Điều kiện sử dụng voucher:', voucherCondition, 'VND');
+    console.log('📋 Điều kiện sử dụng voucher:', voucherCondition, 'VND (0 = không có điều kiện tối thiểu)');
     
     // Tính toán thời gian hiệu lực
     const now = new Date();
@@ -173,7 +173,17 @@ export class VoucherRefundService {
       console.log('❌ Lỗi gửi thông báo cho admin:', error.message);
     }
 
-    console.log('=== BƯỚC 9: HOÀN THÀNH ===');
+    // Đặt stock = 0 sau khi tạo voucher thành công
+    console.log('=== BƯỚC 9: ĐẶT STOCK = 0 ===');
+    try {
+      createdVoucher.stock = 0;
+      await createdVoucher.save();
+      console.log('✅ Đã đặt stock = 0 cho voucher');
+    } catch (error) {
+      console.log('❌ Lỗi khi đặt stock = 0:', error.message);
+    }
+
+    console.log('=== BƯỚC 10: HOÀN THÀNH ===');
     const result = {
       voucher: createdVoucher,
       message: 'Voucher hoàn tiền đã được tạo thành công',
@@ -188,24 +198,23 @@ export class VoucherRefundService {
 
   /**
    * Tính toán giá trị voucher dựa trên số tiền hoàn
-   * Có thể tăng giá trị để khuyến khích mua hàng
+   * Giá trị voucher bằng chính xác số tiền hoàn
    */
   private calculateVoucherValue(refundAmount: number): number {
-    // Logic: Tăng 10% giá trị để khuyến khích mua hàng
-    const bonusPercentage = 0.1; // 10%
-    const result = Math.round(refundAmount * (1 + bonusPercentage));
-    console.log(`🧮 Tính toán voucher: ${refundAmount} × 1.1 = ${result} VND`);
+    // Logic: Giá trị voucher bằng chính xác số tiền hoàn
+    const result = refundAmount;
+    console.log(`🧮 Tính toán voucher: ${refundAmount} = ${result} VND (không tăng giá trị)`);
     return result;
   }
 
   /**
    * Tính toán điều kiện sử dụng voucher
-   * Điều kiện thường bằng 50-80% giá trị voucher
+   * Điều kiện sử dụng là 0 đồng (không có điều kiện tối thiểu)
    */
   private calculateVoucherCondition(voucherValue: number): number {
-    const conditionPercentage = 0.6; // 60% giá trị voucher
-    const result = Math.round(voucherValue * conditionPercentage);
-    console.log(`📋 Tính toán điều kiện: ${voucherValue} × 0.6 = ${result} VND`);
+    // Logic: Điều kiện sử dụng là 0 đồng (không có điều kiện tối thiểu)
+    const result = 0;
+    console.log(`📋 Tính toán điều kiện: ${voucherValue} → 0 VND (không có điều kiện tối thiểu)`);
     return result;
   }
 
@@ -220,17 +229,12 @@ export class VoucherRefundService {
     orderId?: string,
     returnOrderId?: string,
   ): string {
-    const orderInfo = orderId ? ` cho đơn hàng ${orderId}` : '';
-    const returnInfo = returnOrderId ? ` (Yêu cầu trả hàng: ${returnOrderId})` : '';
-    
-    return `Bạn đã nhận được voucher hoàn tiền${orderInfo}${returnInfo}. 
-    
+    return `Bạn đã nhận được voucher hoàn tiền trị giá ${this.formatCurrency(voucherValue)}.
+
 Lý do: ${reason}
-Số tiền hoàn: ${this.formatCurrency(refundAmount)}
-Giá trị voucher: ${this.formatCurrency(voucherValue)}
 Thời hạn sử dụng: ${validDays} ngày
 
-Voucher có thể sử dụng cho đơn hàng tiếp theo với điều kiện tối thiểu ${this.formatCurrency(voucherValue * 0.6)}.`;
+Voucher có thể sử dụng cho đơn hàng tiếp theo.`;
   }
 
   /**
@@ -376,7 +380,7 @@ ${returnOrderId ? `Yêu cầu trả hàng: ${returnOrderId}` : ''}`;
     }
 
     // Kiểm tra điều kiện sử dụng
-    if (orderAmount < voucher.condition) {
+    if (voucher.condition > 0 && orderAmount < voucher.condition) {
       return {
         isValid: false,
         message: `Đơn hàng phải có giá trị tối thiểu ${this.formatCurrency(voucher.condition)}`,
