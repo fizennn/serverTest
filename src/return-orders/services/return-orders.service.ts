@@ -165,10 +165,14 @@ export class ReturnOrdersService {
       .populate('items.productId', 'name images')
       .exec();
 
+    // Lấy thông tin user để có pushToken
+    const user = await this.userModel.findById(userId).select('deviceId').exec();
+    const pushToken = user?.deviceId || null;
+
     // Gửi thông báo cho user và admin khi tạo yêu cầu trả hàng
     await this.notificationService.sendAndSaveNotification(
       userId,
-      null, // pushToken - sẽ được lấy từ user trong service
+      pushToken, // Lấy pushToken từ user
       'Yêu cầu trả hàng',
       `Yêu cầu trả hàng cho đơn hàng ${order._id} đã được tạo thành công`,
       'info',
