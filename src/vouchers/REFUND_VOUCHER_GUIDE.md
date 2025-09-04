@@ -12,6 +12,7 @@
 - Thời hạn sử dụng mặc định 30 ngày
 - Gửi thông báo cho user và admin
 - Đặt stock = 0 sau khi tạo thành công (đánh dấu voucher đã được sử dụng)
+- Cập nhật user để thêm voucher ID vào mảng vouchers
 
 ### 2. Quản lý voucher
 - Lấy danh sách voucher của user
@@ -181,7 +182,8 @@ Service này đã được tích hợp tự động vào `ReturnOrdersService`. 
 2. Gửi thông báo cho user
 3. Gửi thông báo cho admin
 4. Đặt stock = 0 (đánh dấu voucher đã được sử dụng)
-5. Log kết quả
+5. Cập nhật user vouchers
+6. Log kết quả
 
 ## Lợi ích
 

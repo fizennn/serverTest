@@ -183,7 +183,19 @@ export class VoucherRefundService {
       console.log('❌ Lỗi khi đặt stock = 0:', error.message);
     }
 
-    console.log('=== BƯỚC 10: HOÀN THÀNH ===');
+    // Cập nhật user để thêm voucher ID vào mảng vouchers
+    console.log('=== BƯỚC 10: CẬP NHẬT USER VOUCHERS ===');
+    try {
+      await this.userModel.findByIdAndUpdate(
+        userId,
+        { $push: { vouchers: createdVoucher._id } }
+      );
+      console.log('✅ Đã thêm voucher ID vào user vouchers');
+    } catch (error) {
+      console.log('❌ Lỗi khi cập nhật user vouchers:', error.message);
+    }
+
+    console.log('=== BƯỚC 11: HOÀN THÀNH ===');
     const result = {
       voucher: createdVoucher,
       message: 'Voucher hoàn tiền đã được tạo thành công',
@@ -374,10 +386,6 @@ ${returnOrderId ? `Yêu cầu trả hàng: ${returnOrderId}` : ''}`;
       return { isValid: false, message: 'Voucher không trong thời gian hiệu lực' };
     }
 
-    // Kiểm tra stock
-    if (voucher.stock <= 0) {
-      return { isValid: false, message: 'Voucher đã hết' };
-    }
 
     // Kiểm tra điều kiện sử dụng
     if (voucher.condition > 0 && orderAmount < voucher.condition) {

@@ -90,7 +90,7 @@ export class AuthController {
     return { user: userData, tokens };
   }
 
-  @Serialize(UserDto)
+  // @Serialize(UserDto) // Tạm thời bỏ serialize để debug
   @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: 'Lấy thông tin hồ sơ người dùng',
@@ -105,6 +105,16 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @Get('profile')
   getProfile(@CurrentUser() user: UserDocument) {
+    // Debug: Log user trước khi trả về
+    console.log('🔍 [PROFILE_API] User before return:', {
+      id: user._id,
+      email: user.email,
+      vouchers: user.vouchers,
+      vouchersLength: user.vouchers?.length || 0,
+      vouchersType: typeof user.vouchers,
+      isArray: Array.isArray(user.vouchers)
+    });
+    
     return user;
   }
 

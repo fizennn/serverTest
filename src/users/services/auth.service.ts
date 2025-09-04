@@ -40,22 +40,9 @@ export class AuthService {
 
     const tokens = await this.generateTokens(userWithRole);
 
-    // Populate vouchers data - lấy tất cả voucher mà user có quyền sử dụng
-    let userVouchers = [];
-    try {
-      // Lấy tất cả voucher mà user có quyền sử dụng (user ID có trong userId array của voucher)
-      const vouchers = await this.vouchersService.findVouchersByUserId(
-        user._id.toString(),
-      );
-      userVouchers = vouchers; // Không filter isDisable nữa, lấy tất cả voucher của user
-
-      console.log(
-        `Successfully fetched ${userVouchers.length} vouchers for user ${user.email}`,
-      );
-    } catch (error) {
-      console.error('Error fetching vouchers:', error);
-      userVouchers = []; // Đảm bảo trả về array rỗng nếu có lỗi
-    }
+    // Lấy vouchers trực tiếp từ user document thay vì query từ VouchersService
+    // Điều này đảm bảo tính nhất quán và hiệu suất tốt hơn
+    const userVouchers = user.vouchers || [];
 
     return {
       tokens,

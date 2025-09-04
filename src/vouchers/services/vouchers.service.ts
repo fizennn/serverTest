@@ -650,9 +650,6 @@ export class VouchersService {
       return { valid: false, discount: 0, message: 'Voucher is not active' };
     }
 
-    if (voucher.stock <= 0) {
-      return { valid: false, discount: 0, message: 'Voucher is out of stock' };
-    }
 
     if (amount < voucher.condition) {
       return { valid: false, discount: 0, message: `Minimum order amount is ${voucher.condition}` };
@@ -718,14 +715,6 @@ export class VouchersService {
       };
     }
 
-    if (voucher.stock <= 0) {
-      return { 
-        valid: false, 
-        itemDiscount: 0, 
-        shipDiscount: 0, 
-        message: 'Voucher is out of stock' 
-      };
-    }
 
     // Kiểm tra điều kiện tối thiểu
     if (subtotal < voucher.condition) {

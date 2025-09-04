@@ -25,11 +25,38 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Invalid token type');
     }
 
-    // Populate role khi validate user
-    const user = await this.userModel.findById(payload.sub).populate('roleId');
+    // Lấy user với đầy đủ thông tin, bao gồm vouchers được populate
+    const user = await this.userModel.findById(payload.sub)
+      .populate('roleId')
+      .populate('vouchers') // Populate thông tin voucher
+      .lean();
     
     if (!user) {
       throw new UnauthorizedException();
+    }
+
+    // Debug: Log thông tin user để kiểm tra
+    console.log('🔍 [JWT_STRATEGY] User found:', {
+      id: user._id,
+      email: user.email,
+      vouchers: user.vouchers,
+      vouchersLength: user.vouchers?.length || 0,
+      voucherDetails: user.vouchers?.map(v => {
+        if (typeof v === 'string') {
+          return { id: v, name: 'String ID', discount: 'N/A' };
+        }
+        return {
+          id: (v as any)._id,
+          name: (v as any).name,
+          discount: (v as any).discount
+        };
+      })
+    });
+
+    // Đảm bảo field vouchers được giữ nguyên
+    if (!user.vouchers) {
+      user.vouchers = [];
+      console.log('⚠️ [JWT_STRATEGY] Vouchers field was missing, set to empty array');
     }
 
     return user;

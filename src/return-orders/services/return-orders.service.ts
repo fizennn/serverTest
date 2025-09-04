@@ -777,9 +777,13 @@ export class ReturnOrdersService {
 
     const message = statusMessages[updateData.status] || `Trạng thái yêu cầu trả hàng đã được cập nhật thành ${updateData.status}`;
 
+    // Lấy thông tin user để có pushToken
+    const user = await this.userModel.findById(returnRequest.customerId).select('deviceId').exec();
+    const pushToken = user?.deviceId || null;
+
     await this.notificationService.sendAndSaveNotification(
       returnRequest.customerId.toString(),
-      null, // pushToken - sẽ được lấy từ user trong service
+      pushToken, // Lấy pushToken từ user
       'Cập nhật trạng thái trả hàng',
       `${message} cho đơn hàng ${order._id}`,
       'info',
