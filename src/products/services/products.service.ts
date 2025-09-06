@@ -568,6 +568,69 @@ export class ProductsService {
     }, 0);
   }
 
+  /**
+   * Public method để tính tổng stock từ variants (dùng cho các service khác)
+   * @param variants - Mảng các variants
+   * @returns Tổng số stock của tất cả variants
+   */
+  public calculateTotalStockFromVariants(variants: any[]): number {
+    return this.calculateTotalStock(variants);
+  }
+
+  /**
+   * Cập nhật lại thuộc tính countInStock dựa trên stock của các biến thể
+   * @param productId - ID của sản phẩm cần cập nhật
+   * @returns Promise<ProductDocument> - Sản phẩm đã được cập nhật
+   */
+  async updateCountInStock(productId: string): Promise<ProductDocument> {
+    if (!Types.ObjectId.isValid(productId)) {
+      throw new BadRequestException('Invalid product ID.');
+    }
+
+    const product = await this.productModel.findById(productId);
+    if (!product) {
+      throw new NotFoundException('No product with given ID.');
+    }
+
+    // Tính toán lại countInStock dựa trên stock của các biến thể
+    const oldCountInStock = product.countInStock;
+    product.countInStock = this.calculateTotalStock(product.variants);
+
+    console.log(`[UPDATE_COUNT_IN_STOCK] Product: ${product.name}`);
+    console.log(`[UPDATE_COUNT_IN_STOCK] Old countInStock: ${oldCountInStock} -> New countInStock: ${product.countInStock}`);
+
+    return product.save();
+  }
+
+  /**
+   * Cập nhật countInStock cho tất cả sản phẩm trong hệ thống
+   * @returns Promise<{ updated: number, products: ProductDocument[] }> - Số lượng sản phẩm đã cập nhật và danh sách sản phẩm
+   */
+  async updateAllCountInStock(): Promise<{ updated: number, products: ProductDocument[] }> {
+    const products = await this.productModel.find({});
+    const updatedProducts = [];
+
+    console.log(`[UPDATE_ALL_COUNT_IN_STOCK] Found ${products.length} products to update`);
+
+    for (const product of products) {
+      const oldCountInStock = product.countInStock;
+      product.countInStock = this.calculateTotalStock(product.variants);
+      
+      if (oldCountInStock !== product.countInStock) {
+        console.log(`[UPDATE_ALL_COUNT_IN_STOCK] Product: ${product.name} - ${oldCountInStock} -> ${product.countInStock}`);
+        await product.save();
+        updatedProducts.push(product);
+      }
+    }
+
+    console.log(`[UPDATE_ALL_COUNT_IN_STOCK] Updated ${updatedProducts.length} products`);
+    
+    return {
+      updated: updatedProducts.length,
+      products: updatedProducts
+    };
+  }
+
   async findByCategory(
     categoryId: string,
     page?: string,

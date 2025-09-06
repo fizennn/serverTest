@@ -278,6 +278,10 @@ export class OrdersService {
 
       // Cập nhật số lượng tồn kho của size cụ thể
       foundSize.stock -= item.quantity;
+      
+      // Cập nhật countInStock tổng thể dựa trên stock của tất cả variants
+      product.countInStock = this.productsService.calculateTotalStockFromVariants(product.variants);
+      
       await product.save();
     }
 
@@ -548,6 +552,10 @@ export class OrdersService {
 
       // Cập nhật số lượng tồn kho của size cụ thể
       foundSize.stock -= item.quantity;
+      
+      // Cập nhật countInStock tổng thể dựa trên stock của tất cả variants
+      product.countInStock = this.productsService.calculateTotalStockFromVariants(product.variants);
+      
       await product.save();
     }
 
@@ -816,6 +824,10 @@ export class OrdersService {
 
       // Cập nhật số lượng tồn kho của size cụ thể
       foundSize.stock -= item.quantity;
+      
+      // Cập nhật countInStock tổng thể dựa trên stock của tất cả variants
+      product.countInStock = this.productsService.calculateTotalStockFromVariants(product.variants);
+      
       await product.save();
     }
 

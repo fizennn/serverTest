@@ -55,7 +55,7 @@ export class ChatbotController {
     @Body() createConversationDto: CreateConversationDto,
   ): Promise<ChatHistoryDto & { type?: string; dataId?: string; productData?: any }> {
     return this.chatbotService.createConversation(
-      req.user.id,
+      req.user._id,
       createConversationDto,
     );
   }
@@ -79,7 +79,7 @@ export class ChatbotController {
     @Request() req: any,
     @Body() sendMessageDto: SendMessageDto,
   ): Promise<ChatResponseDto> {
-    return this.chatbotService.sendMessage(req.user.id, sendMessageDto);
+    return this.chatbotService.sendMessage(req.user._id, sendMessageDto);
   }
 
   @Get('conversations')
@@ -102,7 +102,7 @@ export class ChatbotController {
     @Request() req: any,
     @Query('type') type?: string,
   ): Promise<ChatResponseDto[] | ChatHistoryDto[]> {
-    const conversations = await this.chatbotService.getChatHistory(req.user.id);
+    const conversations = await this.chatbotService.getChatHistory(req.user._id);
     
     // Nếu type = 'full', trả về toàn bộ lịch sử
     if (type === 'full') {
@@ -148,7 +148,7 @@ export class ChatbotController {
     @Request() req: any,
     @Param('id') conversationId: string,
   ): Promise<ChatResponseDto> {
-    const conversation = await this.chatbotService.getConversation(req.user.id, conversationId);
+    const conversation = await this.chatbotService.getConversation(req.user._id, conversationId);
     
     // Chuyển đổi từ ChatHistoryDto sang ChatResponseDto
     if (conversation.messages && conversation.messages.length > 0) {
@@ -193,7 +193,7 @@ export class ChatbotController {
     @Request() req: any,
     @Param('id') conversationId: string,
   ): Promise<ChatHistoryDto & { type?: string; dataId?: string; productData?: any }> {
-    const conversation = await this.chatbotService.getConversation(req.user.id, conversationId);
+    const conversation = await this.chatbotService.getConversation(req.user._id, conversationId);
     
     // Lấy tin nhắn cuối cùng để kiểm tra type và dataId
     if (conversation.messages && conversation.messages.length > 0) {
@@ -231,7 +231,7 @@ export class ChatbotController {
     @Request() req: any,
     @Param('id') conversationId: string,
   ): Promise<void> {
-    return this.chatbotService.endConversation(req.user.id, conversationId);
+    return this.chatbotService.endConversation(req.user._id, conversationId);
   }
 
   @Delete('conversations/:id')
@@ -249,7 +249,7 @@ export class ChatbotController {
     @Request() req: any,
     @Param('id') conversationId: string,
   ): Promise<void> {
-    return this.chatbotService.deleteConversation(req.user.id, conversationId);
+    return this.chatbotService.deleteConversation(req.user._id, conversationId);
   }
 
   @Get('check-inventory')
@@ -282,6 +282,6 @@ export class ChatbotController {
     description: 'Lấy thống kê thành công',
   })
   async getInventoryCheckAnalytics(@Request() req: any) {
-    return this.chatbotService.getInventoryCheckAnalytics(req.user.id);
+    return this.chatbotService.getInventoryCheckAnalytics(req.user._id);
   }
 } 

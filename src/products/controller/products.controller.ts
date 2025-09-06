@@ -210,4 +210,71 @@ export class ProductsController {
     }
     return this.productsService.createMany(products);
   }
+
+  @UseGuards(AdminGuard)
+  @Put(':id/update-count-in-stock')
+  @ApiOperation({ 
+    summary: 'Cập nhật countInStock cho một sản phẩm', 
+    description: 'Tính toán lại thuộc tính countInStock dựa trên stock của các biến thể' 
+  })
+  @ApiParam({ 
+    name: 'id', 
+    description: 'ID của sản phẩm cần cập nhật',
+    example: '686bd9a9b25d1e23015d4287'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Cập nhật thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        _id: { type: 'string' },
+        name: { type: 'string' },
+        countInStock: { type: 'number' },
+        variants: { type: 'array' }
+      }
+    }
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'ID sản phẩm không hợp lệ' 
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'Không tìm thấy sản phẩm' 
+  })
+  async updateCountInStock(@Param('id') id: string) {
+    return this.productsService.updateCountInStock(id);
+  }
+
+  @UseGuards(AdminGuard)
+  @Put('update-all-count-in-stock')
+  @ApiOperation({ 
+    summary: 'Cập nhật countInStock cho tất cả sản phẩm', 
+    description: 'Tính toán lại thuộc tính countInStock cho tất cả sản phẩm trong hệ thống dựa trên stock của các biến thể' 
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Cập nhật thành công',
+    schema: {
+      type: 'object',
+      properties: {
+        updated: { type: 'number', description: 'Số lượng sản phẩm đã được cập nhật' },
+        products: { 
+          type: 'array', 
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string' },
+              name: { type: 'string' },
+              countInStock: { type: 'number' }
+            }
+          }
+        }
+      }
+    }
+  })
+  async updateAllCountInStock() {
+    return this.productsService.updateAllCountInStock();
+  }
 }

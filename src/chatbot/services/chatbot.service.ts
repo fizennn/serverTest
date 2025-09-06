@@ -479,11 +479,12 @@ Chỉ trả về JSON, không giải thích thêm. Câu: "${message}"`;
   // Hàm phân tích inventory query với context từ cuộc hội thoại
   private async analyzeInventoryQueryByAIWithContext(context: string, currentMessage: string): Promise<{
     isInventoryQuery: boolean;
+    isNextProductRequest: boolean;
     productName: string | null;
     color: string | null;
     size: string | null;
   }> {
-    if (!this.model) return { isInventoryQuery: false, productName: null, color: null, size: null };
+    if (!this.model) return { isInventoryQuery: false, isNextProductRequest: false, productName: null, color: null, size: null };
     
     const prompt = `Dựa trên context cuộc hội thoại sau, phân tích câu hỏi cuối cùng và trả về JSON:
 
@@ -493,10 +494,20 @@ ${context}
 Phân tích câu hỏi cuối cùng và trả về JSON:
 {
   "isInventoryQuery": true/false,
+  "isNextProductRequest": true/false,
   "productName": "tên sản phẩm hoặc null",
   "color": "màu sắc hoặc null", 
   "size": "size hoặc null"
 }
+
+Lưu ý:
+- isInventoryQuery: true nếu là câu hỏi về tồn kho sản phẩm
+- isNextProductRequest: true nếu người dùng muốn xem sản phẩm khác với các từ khóa:
+  * "không thích" + "tìm khác" / "cái khác" / "sản phẩm khác"
+  * "tìm khác" / "cái khác" / "sản phẩm khác" / "váy khác" / "áo khác" / "quần khác"
+  * "không muốn" + "cái khác"
+  * "không phù hợp" + "tìm khác"
+- Nếu isNextProductRequest = true, productName sẽ là tên sản phẩm từ context trước đó
 
 Chỉ trả về JSON, không giải thích thêm.`;
     
@@ -516,15 +527,16 @@ Chỉ trả về JSON, không giải thích thêm.`;
         const obj = JSON.parse(match[0]);
         return {
           isInventoryQuery: obj.isInventoryQuery || false,
+          isNextProductRequest: obj.isNextProductRequest || false,
           productName: obj.productName || null,
           color: obj.color || null,
           size: obj.size || null
         };
       }
-      return { isInventoryQuery: false, productName: null, color: null, size: null };
+      return { isInventoryQuery: false, isNextProductRequest: false, productName: null, color: null, size: null };
     } catch (error) {
       console.error('Lỗi khi phân tích inventory query với context bằng AI:', error.message);
-      return { isInventoryQuery: false, productName: null, color: null, size: null };
+      return { isInventoryQuery: false, isNextProductRequest: false, productName: null, color: null, size: null };
     }
   }
 
@@ -534,27 +546,41 @@ Chỉ trả về JSON, không giải thích thêm.`;
       // Tìm trong các tin nhắn trước đó có chứa tên sản phẩm
       const productKeywords = ['áo', 'quần', 'giày', 'túi', 'mũ', 'nón', 'váy', 'đầm', 'sơ mi', 'jeans', 'sneaker', 'boots'];
       
+      // Tìm trong cả tin nhắn của user và bot
       for (let i = messages.length - 2; i >= 0; i--) {
         const message = messages[i];
-        if (message.role === 'user') {
-          const content = message.content.toLowerCase();
-          
-          // Tìm từ khóa sản phẩm trong tin nhắn
-          for (const keyword of productKeywords) {
-            if (content.includes(keyword)) {
-              // Trích xuất cụm từ chứa từ khóa
-              const words = message.content.split(' ');
-              for (let j = 0; j < words.length; j++) {
-                if (words[j].toLowerCase().includes(keyword)) {
-                  // Lấy 2-3 từ xung quanh để có tên sản phẩm đầy đủ
-                  const start = Math.max(0, j - 1);
-                  const end = Math.min(words.length, j + 3);
-                  const productName = words.slice(start, end).join(' ');
-                  console.log('[Context Extract] Tìm thấy sản phẩm từ context:', productName);
-                  return productName;
-                }
+        const content = message.content.toLowerCase();
+        
+        // Tìm từ khóa sản phẩm trong tin nhắn
+        for (const keyword of productKeywords) {
+          if (content.includes(keyword)) {
+            // Trích xuất cụm từ chứa từ khóa
+            const words = message.content.split(' ');
+            for (let j = 0; j < words.length; j++) {
+              if (words[j].toLowerCase().includes(keyword)) {
+                // Lấy 2-3 từ xung quanh để có tên sản phẩm đầy đủ
+                const start = Math.max(0, j - 1);
+                const end = Math.min(words.length, j + 3);
+                const productName = words.slice(start, end).join(' ');
+                console.log('[Context Extract] Tìm thấy sản phẩm từ context:', productName);
+                return productName;
               }
             }
+          }
+        }
+      }
+      
+      // Nếu không tìm thấy từ khóa, thử tìm trong response của bot (có thể chứa tên sản phẩm)
+      for (let i = messages.length - 2; i >= 0; i--) {
+        const message = messages[i];
+        if (message.role === 'model' && message.content.includes('✅')) {
+          // Tìm tên sản phẩm trong response của bot
+          const content = message.content;
+          const productMatch = content.match(/✅\s*([^,]+?)(?:\s+size|\s+màu|\s+còn|\s+Giá|$)/);
+          if (productMatch) {
+            const productName = productMatch[1].trim();
+            console.log('[Context Extract] Tìm thấy sản phẩm từ bot response:', productName);
+            return productName;
           }
         }
       }
@@ -582,6 +608,8 @@ Chỉ trả về JSON, không giải thích thêm.`;
       // Gộp 3 API calls thành 1 để phân tích câu hỏi tồn kho với context
       const analysis = await this.analyzeInventoryQueryByAIWithContext(contextForAnalysis, lastMessage);
       console.log('[AI Inventory Analysis] Kết quả phân tích:', analysis);
+      console.log('[AI Inventory Analysis] isNextProductRequest:', analysis.isNextProductRequest);
+      console.log('[AI Inventory Analysis] isInventoryQuery:', analysis.isInventoryQuery);
       
       if (analysis.isInventoryQuery && analysis.productName) {
         console.log('[AI Inventory Check] AI xác nhận là câu hỏi tồn kho.');
@@ -639,6 +667,83 @@ Chỉ trả về JSON, không giải thích thêm.`;
           type: 'inventory_check',
           dataId: null,
         };
+      }
+      
+      // Xử lý yêu cầu tìm sản phẩm khác
+      if (analysis.isNextProductRequest) {
+        console.log('[AI Next Product Request] AI xác nhận là yêu cầu tìm sản phẩm khác.');
+        
+        // Tìm sản phẩm từ context trước đó
+        const productFromContext = this.extractProductFromContext(messages);
+        console.log('[AI Next Product Request] Kết quả extractProductFromContext:', productFromContext);
+        if (productFromContext) {
+          console.log('[AI Next Product Request] Tìm thấy sản phẩm từ context:', productFromContext);
+          
+          // Tìm sản phẩm tiếp theo với logic mới
+          const nextProductResult = await this.findNextProduct(productFromContext, messages);
+          
+          if (nextProductResult.found) {
+            const productData = await this.getProductDataForMobile(nextProductResult.productName);
+            return {
+              response: nextProductResult.message,
+              type: 'inventory_check',
+              dataId: productData?.id || null,
+            };
+          } else {
+            return {
+              response: nextProductResult.message,
+              type: 'inventory_check',
+              dataId: null,
+            };
+          }
+        } else {
+          return {
+            response: 'Xin lỗi, tôi không thể tìm thấy sản phẩm nào khác. Bạn có thể nói rõ tên sản phẩm không?',
+            type: 'inventory_check',
+            dataId: null,
+          };
+        }
+      }
+      
+      // Fallback: Kiểm tra thủ công nếu AI không nhận diện được next product request
+      const lowerMessage = lastMessage.toLowerCase();
+      const isNextProductKeywords = ['không thích', 'tìm khác', 'cái khác', 'sản phẩm khác', 'không muốn', 'không phù hợp'];
+      const hasNextProductKeyword = isNextProductKeywords.some(keyword => lowerMessage.includes(keyword));
+      
+      if (hasNextProductKeyword && !analysis.isNextProductRequest) {
+        console.log('[Fallback Next Product] Phát hiện từ khóa next product thủ công');
+        
+        // Tìm sản phẩm từ context trước đó
+        const productFromContext = this.extractProductFromContext(messages);
+        console.log('[Fallback Next Product] Kết quả extractProductFromContext:', productFromContext);
+        
+        if (productFromContext) {
+          console.log('[Fallback Next Product] Tìm thấy sản phẩm từ context:', productFromContext);
+          
+          // Tìm sản phẩm tiếp theo với logic mới
+          const nextProductResult = await this.findNextProduct(productFromContext, messages);
+          
+          if (nextProductResult.found) {
+            const productData = await this.getProductDataForMobile(nextProductResult.productName);
+            return {
+              response: nextProductResult.message,
+              type: 'inventory_check',
+              dataId: productData?.id || null,
+            };
+          } else {
+            return {
+              response: nextProductResult.message,
+              type: 'inventory_check',
+              dataId: null,
+            };
+          }
+        } else {
+          return {
+            response: 'Xin lỗi, tôi không thể tìm thấy sản phẩm nào khác. Bạn có thể nói rõ tên sản phẩm không?',
+            type: 'inventory_check',
+            dataId: null,
+          };
+        }
       }
       
       // Nếu không có Gemini API, sử dụng fallback responses
@@ -1081,6 +1186,106 @@ Hãy nhớ context của cuộc hội thoại trước đó và trả lời phù
     } catch (error) {
       console.error('Lỗi khi lấy dữ liệu sản phẩm theo ID:', error);
       return null;
+    }
+  }
+
+  /**
+   * Tìm sản phẩm tiếp theo dựa trên sản phẩm hiện tại và lịch sử chat
+   */
+  private async findNextProduct(currentProductName: string, messages: ChatMessage[]): Promise<{
+    found: boolean;
+    productName: string;
+    message: string;
+  }> {
+    try {
+      // Lấy tất cả sản phẩm còn hoạt động
+      const products = await this.inventoryCheckerService.productModel.find({ status: true });
+      
+      // Chuẩn hóa tên sản phẩm hiện tại
+      const currentSearchName = this.inventoryCheckerService.removeVietnameseTones(currentProductName).toLowerCase();
+      
+      // Tìm tất cả sản phẩm có chứa từ khóa tương tự
+      const matchedProducts = products.filter(p =>
+        this.inventoryCheckerService.removeVietnameseTones(p.name).toLowerCase().includes(currentSearchName)
+      );
+
+      if (matchedProducts.length === 0) {
+        return {
+          found: false,
+          productName: currentProductName,
+          message: `❌ Không tìm thấy sản phẩm "${currentProductName}" trong hệ thống.`,
+        };
+      }
+
+      // Tìm sản phẩm hiện tại trong danh sách
+      let currentIndex = -1;
+      for (let i = 0; i < matchedProducts.length; i++) {
+        if (this.inventoryCheckerService.removeVietnameseTones(matchedProducts[i].name).toLowerCase() === currentSearchName) {
+          currentIndex = i;
+          break;
+        }
+      }
+
+      // Nếu không tìm thấy sản phẩm hiện tại, lấy sản phẩm đầu tiên
+      if (currentIndex === -1) {
+        currentIndex = 0;
+      }
+
+      // Lấy sản phẩm tiếp theo (hoặc quay lại đầu nếu đã hết)
+      const nextIndex = (currentIndex + 1) % matchedProducts.length;
+      const nextProduct = matchedProducts[nextIndex];
+
+      // Kiểm tra tồn kho của sản phẩm tiếp theo
+      const inventoryQuery = { 
+        productName: nextProduct.name, 
+        color: null, 
+        size: null 
+      };
+      
+      const inventoryResult = await this.inventoryCheckerService.checkInventory(inventoryQuery);
+      
+      if (inventoryResult.found) {
+        return {
+          found: true,
+          productName: nextProduct.name,
+          message: `🔄 Đây là sản phẩm khác: ${inventoryResult.message}`,
+        };
+      } else {
+        // Nếu sản phẩm tiếp theo không còn hàng, thử sản phẩm sau nữa
+        if (matchedProducts.length > 1) {
+          const nextNextIndex = (nextIndex + 1) % matchedProducts.length;
+          const nextNextProduct = matchedProducts[nextNextIndex];
+          
+          const nextInventoryQuery = { 
+            productName: nextNextProduct.name, 
+            color: null, 
+            size: null 
+          };
+          
+          const nextInventoryResult = await this.inventoryCheckerService.checkInventory(nextInventoryQuery);
+          
+          if (nextInventoryResult.found) {
+            return {
+              found: true,
+              productName: nextNextProduct.name,
+              message: `🔄 Đây là sản phẩm khác: ${nextInventoryResult.message}`,
+            };
+          }
+        }
+        
+        return {
+          found: false,
+          productName: currentProductName,
+          message: `❌ Không còn sản phẩm "${currentProductName}" nào khác còn hàng.`,
+        };
+      }
+    } catch (error) {
+      console.error('Lỗi khi tìm sản phẩm tiếp theo:', error);
+      return {
+        found: false,
+        productName: currentProductName,
+        message: '❌ Có lỗi xảy ra khi tìm sản phẩm khác. Vui lòng thử lại sau.',
+      };
     }
   }
 } 
