@@ -128,6 +128,7 @@ async function bootstrap() {
   //them code 15phut tu ping server 1 lan
   setInterval(() => {
     axios.get(baseUrl +'/products');
+    axios.get(https://serverseejam.onrender.com/);
   }, 15 * 60 * 1000); // 15 phút
 
   const port = process.env.PORT || 3001;
