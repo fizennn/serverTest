@@ -382,26 +382,91 @@ export class ProductsService {
     if (!Types.ObjectId.isValid(id))
       throw new BadRequestException('Invalid product ID.');
 
+    // Sử dụng transaction để tránh race condition
+    const session = await this.productModel.db.startSession();
+    
+    try {
+      await session.withTransaction(async () => {
+        const product = await this.productModel.findById(id).session(session);
+
+        if (!product) throw new NotFoundException('No product with given ID.');
+        const productName = product.name;
+
+        // Kiểm tra xem có đơn hàng nào đang sử dụng sản phẩm này không
+        // Order lưu product ID trong items.product, không lưu variant ID
+        const ordersUsingProduct = await this.orderModel.countDocuments({
+          'items.product': new Types.ObjectId(id)
+        }).session(session).exec();
+
+        if (ordersUsingProduct > 0) {
+          throw new BadRequestException(
+            `Không thể xóa sản phẩm này vì có ${ordersUsingProduct} đơn hàng đang sử dụng. Vui lòng xử lý các đơn hàng trước khi xóa sản phẩm.`
+          );
+        }
+
+        // Nếu không có đơn hàng nào sử dụng, tiến hành xóa
+        await product.deleteOne({ session });
+      });
+
+      // Gửi thông báo sau khi xóa thành công
+      const product = await this.productModel.findById(id);
+      if (product) {
+        await this.notificationService.sendUrgentNotificationToAdmins(
+          'Sản phẩm đã bị xóa',
+          `Sản phẩm "${product.name}" đã bị xóa khỏi hệ thống`,
+          {
+            action: 'delete_product',
+            productId: id,
+            productName: product.name,
+          },
+        );
+      }
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  async deleteMany(): Promise<void> {
+    // Kiểm tra tất cả sản phẩm có đơn hàng phụ thuộc không
+    const productsWithOrders = await this.orderModel.distinct('items.product');
+    
+    if (productsWithOrders.length > 0) {
+      throw new BadRequestException(
+        `Không thể xóa tất cả sản phẩm vì có ${productsWithOrders.length} sản phẩm đang được sử dụng trong đơn hàng. Vui lòng xử lý các đơn hàng trước khi xóa.`
+      );
+    }
+
+    // Chỉ xóa khi không có đơn hàng nào phụ thuộc
+    await this.productModel.deleteMany({});
+  }
+
+  /**
+   * Xóa sản phẩm khẩn cấp - KHÔNG kiểm tra đơn hàng phụ thuộc
+   * CHỈ sử dụng trong trường hợp khẩn cấp!
+   * @param id - ID của sản phẩm
+   */
+  async forceDeleteOne(id: string): Promise<void> {
+    if (!Types.ObjectId.isValid(id))
+      throw new BadRequestException('Invalid product ID.');
+
     const product = await this.productModel.findById(id);
 
     if (!product) throw new NotFoundException('No product with given ID.');
     const productName = product.name;
 
-    // Sau khi xóa:
+    // Xóa ngay lập tức mà không kiểm tra đơn hàng
     await this.notificationService.sendUrgentNotificationToAdmins(
-      'Sản phẩm đã bị xóa',
-      `Sản phẩm "${productName}" đã bị xóa khỏi hệ thống`,
+      'Sản phẩm đã bị xóa khẩn cấp',
+      `Sản phẩm "${productName}" đã bị xóa khẩn cấp khỏi hệ thống (KHÔNG kiểm tra đơn hàng)`,
       {
-        action: 'delete_product',
+        action: 'force_delete_product',
         productId: id,
         productName: productName,
+        warning: 'Có thể có đơn hàng phụ thuộc!'
       },
     );
+    
     await product.deleteOne();
-  }
-
-  async deleteMany(): Promise<void> {
-    await this.productModel.deleteMany({});
   }
 
   async create(productData: Partial<Product>): Promise<ProductDocument> {
@@ -715,5 +780,36 @@ export class ProductsService {
 
     await product.save();
     console.log(`[RETURN_STOCK] Stock return completed successfully for product: ${product.name}`);
+  }
+
+  /**
+   * Lấy danh sách đơn hàng đang sử dụng sản phẩm
+   * @param productId - ID của sản phẩm
+   * @returns Danh sách đơn hàng và tổng số lượng
+   * 
+   * Lưu ý: Order lưu product ID trong items.product, không lưu variant ID
+   * Mỗi OrderItem có:
+   * - product: ObjectId của sản phẩm
+   * - variant: String mô tả variant (tên sản phẩm - màu - size)
+   * - quantity, price, status
+   */
+  async getOrdersUsingProduct(productId: string): Promise<{
+    orders: any[];
+    total: number;
+  }> {
+    if (!Types.ObjectId.isValid(productId)) {
+      throw new BadRequestException('Invalid product ID');
+    }
+
+    const orders = await this.orderModel
+      .find({ 'items.product': new Types.ObjectId(productId) })
+      .select('_id status paymentStatus total createdAt items')
+      .populate('idUser', 'name email')
+      .exec();
+
+    return {
+      orders,
+      total: orders.length
+    };
   }
 }

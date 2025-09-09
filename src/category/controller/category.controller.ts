@@ -108,4 +108,38 @@ export class CategoryController {
   async migrateStatus() {
     return this.categoryService.migrateStatus();
   }
+
+  @Get(':id/products')
+  @UseGuards(AdminGuard)
+  @ApiOperation({ 
+    summary: 'Kiểm tra sản phẩm đang sử dụng category - Admin only',
+    description: 'Lấy danh sách sản phẩm đang sử dụng category trước khi xóa'
+  })
+  @ApiParam({ name: 'id', required: true, description: 'ID của category' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Danh sách sản phẩm đang sử dụng category',
+    schema: {
+      type: 'object',
+      properties: {
+        products: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string' },
+              name: { type: 'string' },
+              brand: { type: 'string' },
+              status: { type: 'boolean' }
+            }
+          }
+        },
+        total: { type: 'number', description: 'Tổng số sản phẩm' }
+      }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Category không tồn tại' })
+  async getProductsUsingCategory(@Param('id') id: string) {
+    return this.categoryService.getProductsUsingCategory(id);
+  }
 } 

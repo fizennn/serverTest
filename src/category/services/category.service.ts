@@ -1,13 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Category } from '../schemas/category.schema';
 import { CategoryDto, CategorySearchDto } from '../dtos/category.dto';
+import { Product } from '../../products/schemas/product.schema';
 
 @Injectable()
 export class CategoryService {
   constructor(
     @InjectModel(Category.name) private categoryModel: Model<Category>,
+    @InjectModel(Product.name) private productModel: Model<Product>,
   ) {}
 
   async create(createCategoryDto: CategoryDto): Promise<Category> {
@@ -142,9 +144,24 @@ export class CategoryService {
   }
 
   async remove(id: string): Promise<Category> {
-    const category = await this.categoryModel.findByIdAndDelete(id).exec();
+    // Kiểm tra xem category có tồn tại không
+    const category = await this.categoryModel.findById(id).exec();
     if (!category) throw new NotFoundException('Category not found');
-    return category;
+
+    // Kiểm tra xem có sản phẩm nào đang sử dụng category này không
+    const productsUsingCategory = await this.productModel.countDocuments({ 
+      category: id 
+    }).exec();
+
+    if (productsUsingCategory > 0) {
+      throw new BadRequestException(
+        `Không thể xóa category này vì có ${productsUsingCategory} sản phẩm đang sử dụng. Vui lòng chuyển các sản phẩm sang category khác trước khi xóa.`
+      );
+    }
+
+    // Nếu không có sản phẩm nào sử dụng, tiến hành xóa
+    const deletedCategory = await this.categoryModel.findByIdAndDelete(id).exec();
+    return deletedCategory;
   }
 
   async debug(): Promise<any> {
@@ -179,6 +196,26 @@ export class CategoryService {
       message: 'Cập nhật status thành công',
       modifiedCount: result.modifiedCount,
       matchedCount: result.matchedCount
+    };
+  }
+
+  /**
+   * Lấy danh sách sản phẩm đang sử dụng category
+   * @param categoryId - ID của category
+   * @returns Danh sách sản phẩm và tổng số lượng
+   */
+  async getProductsUsingCategory(categoryId: string): Promise<{
+    products: any[];
+    total: number;
+  }> {
+    const products = await this.productModel
+      .find({ category: categoryId })
+      .select('_id name brand status')
+      .exec();
+
+    return {
+      products,
+      total: products.length
     };
   }
 } 

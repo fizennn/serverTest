@@ -122,7 +122,29 @@ export class ProductsController {
 
   @UseGuards(AdminGuard)
   @Delete(':id')
-  deleteUser(@Param('id') id: string) {
+  @ApiOperation({ 
+    summary: 'Xóa sản phẩm (có kiểm tra đơn hàng)', 
+    description: 'Xóa sản phẩm với kiểm tra đơn hàng phụ thuộc. Sẽ báo lỗi nếu có đơn hàng đang sử dụng sản phẩm này.' 
+  })
+  @ApiParam({ 
+    name: 'id', 
+    required: true, 
+    description: 'ID của sản phẩm cần xóa',
+    example: '686bd9a9b25d1e23015d4287'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Xóa sản phẩm thành công' 
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'Không thể xóa vì có đơn hàng phụ thuộc' 
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'Sản phẩm không tồn tại' 
+  })
+  deleteProduct(@Param('id') id: string) {
     return this.productsService.deleteOne(id);
   }
 
@@ -276,5 +298,78 @@ export class ProductsController {
   })
   async updateAllCountInStock() {
     return this.productsService.updateAllCountInStock();
+  }
+
+  @Get(':id/orders')
+  @UseGuards(AdminGuard)
+  @ApiOperation({ 
+    summary: 'Kiểm tra đơn hàng đang sử dụng sản phẩm - Admin only',
+    description: 'Lấy danh sách đơn hàng đang sử dụng sản phẩm trước khi xóa'
+  })
+  @ApiParam({ 
+    name: 'id', 
+    required: true, 
+    description: 'ID của sản phẩm',
+    example: '686bd9a9b25d1e23015d4287'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Danh sách đơn hàng đang sử dụng sản phẩm',
+    schema: {
+      type: 'object',
+      properties: {
+        orders: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string', description: 'ID đơn hàng' },
+              status: { type: 'string', description: 'Trạng thái đơn hàng' },
+              paymentStatus: { type: 'string', description: 'Trạng thái thanh toán' },
+              total: { type: 'number', description: 'Tổng tiền đơn hàng' },
+              createdAt: { type: 'string', description: 'Ngày tạo đơn hàng' },
+              idUser: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  email: { type: 'string' }
+                },
+                description: 'Thông tin người dùng'
+              }
+            }
+          }
+        },
+        total: { type: 'number', description: 'Tổng số đơn hàng' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'ID sản phẩm không hợp lệ' })
+  @ApiResponse({ status: 404, description: 'Sản phẩm không tồn tại' })
+  async getOrdersUsingProduct(@Param('id') id: string) {
+    return this.productsService.getOrdersUsingProduct(id);
+  }
+
+  @UseGuards(AdminGuard)
+  @Delete(':id/force')
+  @ApiOperation({ 
+    summary: 'Xóa sản phẩm khẩn cấp (KHÔNG kiểm tra đơn hàng) - Admin only',
+    description: 'Xóa sản phẩm ngay lập tức mà không kiểm tra đơn hàng phụ thuộc. CHỈ sử dụng trong trường hợp khẩn cấp!' 
+  })
+  @ApiParam({ 
+    name: 'id', 
+    required: true, 
+    description: 'ID của sản phẩm cần xóa khẩn cấp',
+    example: '686bd9a9b25d1e23015d4287'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Xóa sản phẩm khẩn cấp thành công' 
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'Sản phẩm không tồn tại' 
+  })
+  forceDeleteProduct(@Param('id') id: string) {
+    return this.productsService.forceDeleteOne(id);
   }
 }
